@@ -40,3 +40,5 @@ vignettes/*.pdf
 *.xport
 # Access
 *.mdb
+*.DS_Store
+.DS_Store
