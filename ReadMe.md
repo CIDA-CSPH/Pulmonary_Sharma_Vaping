@@ -1,6 +1,6 @@
 # Sharma_Vaping  
 **PI:** Sunita Sharma, MD  
-**Analyst:** Ryan A. Peterson  
+**Analyst:** Trent Hawkins  
 
 Details about the folders:
 

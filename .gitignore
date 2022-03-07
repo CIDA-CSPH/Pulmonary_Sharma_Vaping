@@ -30,6 +30,7 @@ vignettes/*.pdf
 *.rdata
 *.rda
 # Text files
+*.gtf
 *.csv
 *.txt
 *.dat
