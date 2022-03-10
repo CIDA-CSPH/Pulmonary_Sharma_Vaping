@@ -9,14 +9,14 @@ deseqobj_naive <-
   DESeq()
 
 # plotDispEsts(deseqobj_naive)
-
+# looks like she normalised using a VST transformation (Trent)
 vstcounts_naive <-
   deseqobj_naive %>% vst()
 
-DERresults(deseqobj_naive, tidy = T)
+#DERresults(deseqobj_naive, tidy = T)
+results(deseqobj_naive, tidy = T) #Looks like old function might be depractaed -Trent
 
-
-
+#more gene filtering? (Trent)
 
 filter_genes_variance <- 
   vstcounts_naive %>%
@@ -24,6 +24,8 @@ filter_genes_variance <-
   apply(., 1, mean) %>%
   order(decreasing = T) %>%
   .[1:2500]
+
+#PCA start (Trent)
 pca_naive <-
   assay(vstcounts_naive) %>%
   .[filter_genes_variance, ] %>%

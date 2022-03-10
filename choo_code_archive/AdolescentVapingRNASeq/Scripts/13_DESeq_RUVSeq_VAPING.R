@@ -53,12 +53,14 @@ dm_ruv_test <-
 #   theme_few()
 # 
 
-
+#Run RUVr (Trent)
 ruv_results <-
   RUVr(x = vstcounts_preruv,
        k = 4,
        residuals = resid_vals %>% t,
        isLog = T)
+
+#Run AOV using Distance Matrices (Trent)
 adonis(dm_ruv_test ~
          ruv_results$W +
          VapingLast6Mo + AgeScaled + EthnicityLatino + GenderMale,
@@ -69,7 +71,7 @@ metadata_final <-
   bind_cols(ruv_results$W %>% as_tibble() %>% set_names(paste0("RUV", 1:ncol(.))))
 
 
-
+#Start Running DESeq for Lung fx variables (Trent)
 run_DESeq_lung_fxn <-
   function(variable_of_interest, contrast_extract = NULL,
            suffix = "_RUV",
@@ -92,7 +94,7 @@ run_DESeq_lung_fxn <-
     deseqobj <-
       deseqobj %>%
       DESeq()
-    
+#looking for outliers (Trent)    
     if (outlier_downweight) {
       # https://support.bioconductor.org/p/103959/
       cooks <- assays(deseqobj)[["cooks"]]
@@ -149,7 +151,7 @@ ggplot(data = NULL, aes(metadata_final$VapingLast6Mo,
 
 
 
-
+# Starting PCA for RUV output (Trent)
 PCA_ruv <-
   prcomp(t(ruv_results$normalizedCounts), scale. = T)
 percentexp_ruv <-
