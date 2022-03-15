@@ -25,6 +25,8 @@ vignettes/*.pdf
 *.utf8.md
 *.knit.md
 # R Data files
+*.RdataTMP
+*.RdataTMP1
 *.RData
 *.rda
 *.rdata

@@ -89,7 +89,18 @@ Measures of lung function and IOS were visually inspected for normality using hi
 &nbsp;  
 
   * Gene Filtering Parameters\:
-    * Removed genes with count = 0 and genes with range of counts > 100
+    * Remove genes with 0 counts
+      * before filter: 60651
+      * after filter: 46356
+      * genes removed: 14295
+    * Remove genes with 0 counts in greater than 75% of samples (Choo original Filter)
+      * before filter: 60651
+      * after filter: 31505
+      * genes removed: 29146
+    * Remove genes with count range > 100 between samples (Choo original filter)
+      * before filter: 31505
+      * after filter: 14645
+      * genes removed: 16860
   * Normalization\:  
     * Variance Stabilizing Transformation (VST) found in code
   * Technical effects\:

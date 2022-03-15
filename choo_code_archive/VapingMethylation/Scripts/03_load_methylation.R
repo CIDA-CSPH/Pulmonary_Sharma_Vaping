@@ -55,13 +55,13 @@ pca_df <-
   final_metadata %>%
   bind_cols(pca_results$x[ , 1:3] %>% as_tibble)
 
-ggplot(pca_df, aes(PC1, PC2, color = VapingLast6Mo)) + #, color = sex, shape = sex)) +
+ggplot(pca_df, aes(PC1, PC2, color = sex, shape = sex)) + #, color = sex, shape = sex)) +
   geom_point(alpha = 0.75) +
   geom_text_repel(
   aes(label = SID),
   color = "black", size = 2) +
-  # scale_shape_manual(name = "Sex", values = palette_shape_sex, labels = c("Female", "Male")) +
-  # scale_color_manual(name = "Sex", values = palette_color_sex, labels = c("Female", "Male")) +
+  scale_shape_manual(name = "Sex", values = palette_shape_sex, labels = c("Female", "Male")) +
+  scale_color_manual(name = "Sex", values = palette_color_sex, labels = c("Female", "Male")) +
   xlab(pca_percent_exp[1]) + ylab(pca_percent_exp[2]) +
   ggtitle("Methylation PCA") +
   theme_few() +
