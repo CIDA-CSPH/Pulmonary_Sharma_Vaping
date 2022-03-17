@@ -101,6 +101,8 @@ Measures of lung function and IOS were visually inspected for normality using hi
       * before filter: 31505
       * after filter: 14645
       * genes removed: 16860
+      
+
   * Normalization\:  
     * Variance Stabilizing Transformation (VST) found in code
   * Technical effects\:
@@ -211,7 +213,6 @@ r5_box <- tab1_dat %>%
 x20_box <- tab1_dat %>%
   ggplot(aes(x = vape_6mo_lab, y = x20, fill = vape_6mo_lab)) +
   geom_boxplot(show.legend = F) +
-  stat_summary()
   labs(x = "Vape Status", y = "X20") +
   ggtitle("X20 by Vape Status (n = 44)")
 
