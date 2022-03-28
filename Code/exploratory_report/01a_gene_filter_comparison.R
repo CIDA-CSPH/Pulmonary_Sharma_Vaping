@@ -1,60 +1,41 @@
-#load libraries
 library(tidyverse)
-library(readr)
 library(here)
-library(kableExtra)
+
 
 #read in raw gene counts
 raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
 
 #table to store results
-gene_filter_tab <- matrix(nrow = 4, ncol = 4)
+gene_filter_mat <- matrix(nrow = 4, ncol = 4)
 
-colnames(gene_filter_tab) <- c("Inclusion Criteria", "Read Count Before", "Read Count After", "Reads Removed")
+colnames(gene_filter_mat) <- c("Inclusion Criteria", "Read Count Before", "Read Count After", "Reads Removed")
 
-gene_filter_tab[,1] <- c("At least one sample has > 0 reads", "At least 25% of the samples have > 0 reads",
-                         "The range of reads across all samples < 100", ">=5 reads in at least 2 samples (Bioconductor)")
-
-gene_filter_tab[,2] <- rep(60651, 4)
+gene_filter_mat[,1] <- c("At least one sample has > 0 reads", "At least 25% of the samples have > 0 reads",
+                         "The range of reads across all samples < 100", ">5 reads in at least 2 samples (Bioconductor)")
 
 #remove all genes with 0 counts
 filter_0_count <- raw_gene_count %>% 
   select(-Feature) %>% 
   apply(., 1, function(x) sum(x) == 0)
 
-sum(filter_0_count)
 
 zero_genes_filtered <- raw_gene_count[!filter_0_count,]
-
-
 
 #remove all genes with 0 counts in 75% or more of samples
 filter_0_.75_count <- raw_gene_count %>% 
   select(-Feature) %>% 
   apply(., 1, function(x) sum(x == 0) >= 49*.75)
 
-sum(filter_0_.75_count)
 
 zero_count_.75_filtered <- raw_gene_count[!filter_0_.75_count,]
 
 #remove all genes with range >= 100
-filter_range_100 <- raw_gene_count %>% 
+filter_range_100 <- zero_count_.75_filtered %>% 
   select(-Feature) %>% 
   apply(.,1, function(x) (max(x) - min(x)) >= 100)
 
-sum(filter_range_100)
+range_100_filtered <- zero_count_.75_filtered[!filter_range_100,]
 
-range_100_filtered <- raw_gene_count[!filter_range_100,]
-
-#choo original code 
-#remove counts with range > 100? (Trent)
-filter_genes_range <-
-  raw_gene_count[ , -1] %>%
-  apply(., 1, function(x) { max(x) - min(x) } ) %>%
-  `>=`(., 100)
-sum(filter_genes_range)
-
-filter_genes_range == filter_range_100
 
 #Bioconductor suggested filter (at least two samples with > 5 counts)
 filter <- raw_gene_count %>% 
@@ -65,9 +46,43 @@ bioconductor_filter <- raw_gene_count[filter,]
 
 gene_count_after <- c(nrow(zero_genes_filtered), nrow(zero_count_.75_filtered), nrow(range_100_filtered), nrow(bioconductor_filter))
 
-gene_filter_tab[,3] <- gene_count_after
+gene_filter_mat[,2] <- c(nrow(raw_gene_count), nrow(raw_gene_count), nrow(zero_count_.75_filtered), nrow(raw_gene_count))
 
-gene_filter_tab[,4] <- c(sum(filter_0_count), sum(filter_0_.75_count), sum(filter_range_100), sum(!filter))
+gene_filter_mat[,3] <- gene_count_after
 
-kbl(gene_filter_tab, booktabs = T, digits = 3) %>%
+gene_filter_mat[,4] <- c(sum(filter_0_count), sum(filter_0_.75_count), sum(filter_range_100), sum(!filter))
+
+gene_filter_tib <- as_tibble(gene_filter_mat) %>% 
+  filter(gene_filter_mat[,3] != 46356) %>% 
+  mutate(Filter = c(1,2,3), "Analysis Used" = c("Previous", "Previous", "Current")) %>% 
+  select(Filter, "Analysis Used", everything())
+
+filter_compar <- kbl(gene_filter_tib, booktabs = T, digits = 3) %>%
   kable_styling(position = "center", latex_options = c("striped", "hold_position"))
+
+##gene range filter
+range_filter <- (function(x) (max(x) - min(x)))
+
+#Get the range for each gene
+filter_range_test <- zero_count_.75_filtered %>% 
+  select(-Feature) %>% 
+  apply(.,1, function(x) (max(x) - min(x)))
+
+#Set a range of thresholds
+range_to_test <- seq(50,500,10)
+
+#Apply the range of thresholds
+genes_removed <- t(sapply(filter_range_test, function(x) x <= range_to_test)) %>% 
+  apply(., 2, function(x) sum(x))
+
+
+#make empty table
+range_test_mat <- tibble(range = range_to_test,
+                         genes_removed = genes_removed)
+
+#Show cutoffhow to 
+range_cutoff <- range_test_mat %>% 
+  ggplot(aes(x = range, y = genes_removed)) +
+  geom_point() + 
+  geom_hline(yintercept = 14678, color = 'red', linetype = 'dashed') +
+  labs(x = "Range Threshold", y = "Genes Removed")

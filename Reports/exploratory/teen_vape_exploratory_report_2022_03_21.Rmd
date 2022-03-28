@@ -8,6 +8,7 @@ author: |
  | Investigator(s): `r CIDAtools::ProjectPI()`
  |
  | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+
 output:
   html_document:
     highlight: espresso
@@ -90,7 +91,7 @@ Measures of lung function and IOS were visually inspected for normality using hi
 
 *Annotation: Ensembl annotation for GrCH 39 ver. 37*\
 *Differential Expression Analysis: DESeq2 `r package.version("DESeq2")`*\
-*Removal of Unwanted Variance: RUVSeq `r package.version("RUVSeq")`*
+*Removal of Unwanted Variance: RUVSeq `r package.version("RUVSeq")` and edgeR `r package.version("edgeR")`*
 
 *Gene Filtering Parameters*\
 This analysis will conduct a comparison of various gene-filtering parameters presented in previous analyses and in the current literature to select parameters best-suited for this study.
@@ -98,7 +99,7 @@ This analysis will conduct a comparison of various gene-filtering parameters pre
 *Normalization*\
 The following analyses used the function RUVr from the R package RUVSeq. RUVr uses the deviance residuals from a first pass negative binomial GLM to perform a factor analysis which corrects for unwanted technical effects. The first-pass model formula is presented below :
 
-$$raw \ read \ count \sim \beta_0 * vape \ status \ + \beta_1 *male \ + \beta_2 * latinx$$
+$$raw \ read \ count \sim \beta_0 + \beta_1 * vape \ status \ + \beta_2 *male \ + \beta_3 * latinx$$
 
 RUVr will be performed with k = 1 through k = 5 factors and the best cutoff for factor analysis will be determined visually using RLE plots and dendrograms for each level k. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
 
@@ -238,73 +239,193 @@ ggarrange(hist_fev1_fvc, ggarrange(r5_box, x20_box, ncol = 2, nrow = 1, legend =
 
 *Table 2: Comparison of Gene Filtering Parameters*
 
-The table below compares gene-filtering parameters from previous analyses to a parameter presented by the creators of the RUVseq package.
+The table below compares gene-filtering parameters from previous analyses to a parameter presented by the creators of the RUVseq package. The previous analysis used Filters 1 and 2, sequentially, and conducted analysis of 14645 genes. This analysis will use Filter 3 and conduct analysis of 29141 genes.
+
 
 ```{r gene_compare_table, echo=TRUE, message=FALSE, warning=FALSE}
-source(here("Code/exploratory_report/01a_gene_filter_comparison.R"), local = knitr::knit_global())
+#read in raw gene counts
+raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
 
-filter_compar
+#table to store results
+gene_filter_mat <- matrix(nrow = 3, ncol = 4)
+
+colnames(gene_filter_mat) <- c("Inclusion Criteria", 
+                               "Read Count Before", 
+                               "Read Count After", 
+                               "Reads Removed")
+
+gene_filter_mat[,1] <- c("At least 25% of the samples have > 0 reads",
+                         "The range of reads across all samples > 100", 
+                         ">=5 reads in at least 2 samples (Bioconductor)")
+
+#remove all genes with 0 counts
+filter_0_count <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) sum(x) == 0)
+
+
+zero_genes_filtered <- raw_gene_count[!filter_0_count,]
+
+#remove all genes with 0 counts in 75% or more of samples
+filter_0_.75_count <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) sum(x == 0) <= 49*.75)
+
+
+zero_count_.75_filtered <- raw_gene_count[filter_0_.75_count,]
+
+#remove all genes with range <= 100
+filter_range_100 <- zero_count_.75_filtered %>% 
+  select(-Feature) %>% 
+  apply(.,1, function(x) (max(x) - min(x)) >= 100)
+
+range_100_filtered <- zero_count_.75_filtered[filter_range_100,]
+
+
+#Bioconductor suggested filter (at least two samples with > 5 counts)
+filter <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) length(x[x>5])>=2)
+
+bioconductor_filter <- raw_gene_count[filter,]
+
+gene_count_after <- c(nrow(zero_count_.75_filtered), nrow(range_100_filtered), nrow(bioconductor_filter))
+
+gene_filter_mat[,2] <- c(nrow(raw_gene_count), nrow(zero_count_.75_filtered), nrow(raw_gene_count))
+
+gene_filter_mat[,3] <- gene_count_after
+
+gene_filter_mat[,4] <- c(sum(!filter_0_.75_count), sum(!filter_range_100), sum(!filter))
+
+gene_filter_tib <- as_tibble(gene_filter_mat) %>% 
+  filter(gene_filter_mat[,3] != 46356) %>% 
+  mutate(Filter = c(1,2,3), "Analysis Used" = c("Previous", "Previous", "Current")) %>% 
+  select(Filter, "Analysis Used", everything())
+
+kbl(gene_filter_tib, booktabs = T, digits = 3) %>%
+  kable_styling(position = "center", latex_options = c("striped", "hold_position"))
 ```
 
-*Figure 3: Genes removed for read-count cutoff values*
-The figure below is used to visually assess how many genes are removed across cutoff values for the range of reads for each gene across the 49 samples after filtering out genes that have 0 read counts in 75% or more of the samples. The red line represents the number of genes (14678) removed at the cutoff range of 100 (the value used in previous analyses).
+*Figure 3: Relative Log Expression Prior to RUV*
 
-```{r}
-range_cutoff
-```
+The following figure shows the Relative Log Expression (RLE) of read counts for each sample without the use of RUVr or any other transformation technique.
+
+```{r ruvr, echo=TRUE, fig.width= 10, message=FALSE, warning=FALSE}
+#read in raw gene counts
+raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
 
 
-*Figure 4: Relative Loge Expression and Principal Component Analysis Prior to RUV*
+#Bioconductor suggested filter
+filter <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) length(x[x>5])>=2)
 
-The following figure shows the Relative Log Expression (RLE) and Principal Component Analysis (PCA) of read counts for each sample without the use of RUVr or any other transformation technique. Sample23 (SID = 144) has been removed due to missing vape status. 
+filtered_gene_count <- raw_gene_count[filter,]
 
-```{r ruvr, message=FALSE, warning=FALSE, fig.height=8, fig.width= 10}
-source(here("Code/exploratory_report/01_gene_filter_and_ruv.R"), local = knitr::knit_global())
+#convert gene count matrix
+filtered_gene_count <- as.data.frame(filtered_gene_count)
+rownames(filtered_gene_count) <- filtered_gene_count[,1]
+filtered_gene_count <- filtered_gene_count[,-1]
+
+#create a list of genes
+genes <- rownames(filtered_gene_count)[grep("^ENS", rownames(filtered_gene_count))]
+
+#Filter out Sample23(no vape status)
+filtered_gene_count <- filtered_gene_count %>% 
+  select(-Sample23)
+
+##Prepare for RUV
+
+#Load metadata
+id_relate <- read_tsv(file = here("DataRaw/20201216_coreID_to_PID.txt"), col_names = T) %>%
+  clean_names()
+metadata_unjoined <- read_csv(file = here("DataProcessed/metadata_cleaning/table1_clean_data_2022_03_02.csv"))
+
+#Join metadata
+metadata_joined <- id_relate %>% 
+  mutate(new_id = str_pad(new_id, 2, "left", "0") %>% paste0("Sample", .)) %>% 
+  left_join(metadata_unjoined, by = "sid") %>% 
+  filter(new_id %in% names(filtered_gene_count))
+
+#Set up factors properly
+metadata_joined$male_lab <- factor(metadata_joined$male_lab, 
+                                   levels = c("Not Male", "Male"))
+metadata_joined$vape_6mo_lab <- factor(metadata_joined$vape_6mo_lab, 
+                                       levels = c("Did Not Vape in Last 6 Months", "Vaped in Last 6 Months"))
+metadata_joined$latino_lab <- factor(metadata_joined$latino_lab, 
+                                     levels = c("Non-LatinX", "LatinX"))
+
+#Filter out the subject with missing vape status
+metadata_joined <- metadata_joined %>% 
+  filter(new_id != 'Sample23')
+
+#make easier to reference
+vape_status <- metadata_joined$vape_6mo_lab
+
+male <- metadata_joined$male_lab
+
+latinx <- metadata_joined$latino_lab
+
+#convert to SEqExpressionSet object
+ruv_prep <- newSeqExpressionSet(as.matrix(filtered_gene_count), 
+                                phenoData = data.frame(vape_status, 
+                                                       male, 
+                                                       latinx, 
+                                                       row.names = metadata_joined$new_id))
+
 
 #Look at raw sample
-library(RColorBrewer)
-colors <- brewer.pal(3,"Set2")
-par(mfrow = c(2,1))
-plotRLE(ruv_prep, outline=FALSE, ylim=c(-4, 4), col = colors[metadata_joined$vape_6mo_lab])
-plotPCA(ruv_prep, col = colors[metadata_joined$vape_6mo_lab])
+par(mfrow = c(1,1))
+plotRLE(ruv_prep, outline=FALSE, ylim=c(-4, 4))
 ```
 
-*Figure 5: RLE and PCA Excluding Outlier Samples*
-It appears that Sample 12 (SID = 102) may be an outlier. Below are the RLE and PCA plots with the sample removed. 
+To visually inspect for the best cutoff for factor analysis, RUVr was run for k = 1 through k = 5 factors. The RLE plots for k = 3 through k = 5 are presented below.
 
-```{r, message=FALSE, warning=FALSE,fig.height=8, fig.width= 10}
-par(mfrow = c(2,1))
-plotRLE(ruv_ready, outline=FALSE, ylim=c(-4, 4), col = colors[metadata_joined$vape_6mo_lab] )
-plotPCA(ruv_ready, col = colors[metadata_joined$vape_6mo_lab])
-```
+```{r RUVr Continues, echo=TRUE, message=FALSE, warning=FALSE, fig.height=8, fig.width= 10}
+##Get the residuals matrix
+#Design Matrix
+design <- model.matrix(~ vape_status + male + latinx, data = pData(ruv_prep))
+#get library size for each sample
+ruv_counts <- DGEList(counts = counts(ruv_prep), group = vape_status)
+#get commen negative binomial dispersion factor
+ruv_counts <- estimateGLMCommonDisp(ruv_counts, design = design)
+#fit log-linear negative binomial generalized model to the read counts for each gene
+first_pass <- glmFit(ruv_counts, design = design)
+#get the residuals from that model
+first_pass_residuls <- residuals(first_pass, type="deviance")
 
-Both the RLE and PCA plots appear to improve when Sample 12 is excluded. All following analyses will exclude the sample. 
+## Run RUVr
+#K = 1
+ruv_k1 <- RUVr(ruv_prep, cIdx = genes, k = 1, residuals = first_pass_residuls)
 
-*Figure 6: Comparison of RUVr Factor Inclusion*
-To visually inspect for the best cutoff for factor analysis, RUVr was run for k = 1 through k = 5 factors. The RLE plots for each are presented below.
+#K = 2
+ruv_k2 <- RUVr(ruv_prep, cIdx = genes, k = 2, residuals = first_pass_residuls)
 
-```{r RUVr Continues, message=FALSE, warning=FALSE, fig.height=8, fig.width= 10}
+#K = 3
+ruv_k3 <- RUVr(ruv_prep, cIdx = genes, k = 3, residuals = first_pass_residuls)
+
+#K = 4
+ruv_k4 <- RUVr(ruv_prep, cIdx = genes, k = 4, residuals = first_pass_residuls)
+
+#K = 5
+ruv_k5 <- RUVr(ruv_prep, cIdx = genes, k = 5, residuals = first_pass_residuls)
+
+
 #Make nicer plot
-par(mfrow = c(5,1))
+par(mfrow=c(3,1), cex = 0.5, cex.lab = 1.5, mar=c(2,5,0.5,0))
 
-plotRLE(ruv_k1, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 3")
-abline(h = c(.5, -.5), col = c("red", "red"))
+plotRLE(ruv_k3, outline=FALSE, ylim=c(-1, 1), ylab = "k = 3")
+abline(h = c(0.5, -0.5), col = c("red", "red"))
 
-plotRLE(ruv_k2, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 3")
-abline(h = c(.5, -.5), col = c("red", "red"))
+plotRLE(ruv_k4, outline=FALSE, ylim=c(-1, 1), ylab = "k = 4")
+abline(h = c(0.5, -0.5), col = c("red", "red"))
 
-plotRLE(ruv_k3, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 3")
-abline(h = c(.5, -.5), col = c("red", "red"))
-
-plotRLE(ruv_k4, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 4")
-abline(h = c(.5, -.5), col = c("red", "red"))
-
-plotRLE(ruv_k5, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 5")
-abline(h = c(.5, -.5), col = c("red", "red"))
+plotRLE(ruv_k5, outline=FALSE, ylim=c(-1, 1), ylab = "k = 5")
+abline(h = c(0.5, -0.5), col = c("red", "red"))
 
 ```
 
-The dendrograms for k = 3 and k = 4 are compared below
+The dendrograms for k = 4 and k = 5 are compared below. 
 
 ```{r}
 #Make Dendrograms
@@ -316,12 +437,19 @@ calDend <- function(x){
 }
 
 par(mfrow=c(2,1), cex = 0.5, cex.lab = 1.5, las = 3, mar=c(4.5,5,0.5,0))
-k3_dend <- plot(calDend(ruv_k3), ylab = "k=3", col = colors[metadata_joined$vape_6mo_lab])
-k4_dend <- plot(calDend(ruv_k4), ylab = "k=4", col = colors[metadata_joined$vape_6mo_lab])
+plot(calDend(ruv_k4), ylab = "k=4", cex.axis = 1.5)
+plot(calDend(ruv_k5), ylab = "k=5", cex.axis = 1.5)
 ```
 
 # Notes
 
+-   I have redone RUVSeq. I will need Cheyret's help diagnosing which 'K' is best.
+-   I would like to discuss the comparison of different gene-filtering methods to figure out what constitutes a "best" method.
+
+# Questions
+
+-   Does Sunita have the V1 of Choo's last report? (20210412_Vaping_RNASeq_Results_v2)
+-   I have not yet been able to fiind an explanation for why Choo used the filters presented in table 2. Katerina, are these filtering parameters reasonable to you? 
 
 <!-- footer -->
 
