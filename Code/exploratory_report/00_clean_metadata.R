@@ -7,7 +7,7 @@ library(here)
 library(forcats)
 
 #read in data
-all_metadata <- readr::read_csv(here::here("DataProcessed", "all_data_Latino_Youth_survey_clean_pulmfxn_FINAL_3.23.21.csv"))
+all_metadata <- readr::read_csv(here::here("choo_code_archive/AdolescentVapingRNASeq/Data/20210325/all_data_Latino_Youth_survey_clean_pulmfxn_FINAL_3.23.21.csv"))
 
 head(all_metadata)
 glimpse(all_metadata)
@@ -25,6 +25,12 @@ vape_dat_clean %>%
   summarise(N = n()) %>% 
   ungroup
 
+#Fix cities
+vape_dat_clean <- vape_dat_clean %>% 
+mutate(recruitment_center = case_when(city == "Aurora" ~ "Aurora",
+                                      city == "Pueblo" | city == "Avondale" | city == "Mineral" ~ "Pueblo",
+                                      T ~ "CommCity/Denver"))
+
 #Check 'sex' (gender variable is actually sex variable)
 vape_dat_clean %>% 
   group_by(gender) %>%
@@ -38,7 +44,7 @@ vape_dat_clean %>%
 vape_dat_clean <- vape_dat_clean %>% 
   mutate(sex_lab = case_when(gender == 1 ~ 'Male',
                              gender == 2 ~ 'Female',
-                             gender == 5 ~ 'Non-Binary'))
+                             gender == 5 ~ 'Female')) #Cheyret used Methylation data to confirm non-binary indiv is Female
 #Check Grade
 vape_dat_clean %>% 
   group_by(grade) %>% 
@@ -57,7 +63,7 @@ vape_dat_clean %>%
 
 #Latino Label
 vape_dat_clean <- vape_dat_clean %>% 
-  mutate(latino_lab = if_else(latino == 1, 'Latino', 'Non-Latino'))
+  mutate(latino_lab = if_else(latino == 1, 'LatinX', 'Non-LatinX'))
 
 #check ever_vaped?
 vape_dat_clean %>% 
@@ -94,7 +100,8 @@ vape_dat_clean %>%
 vape_dat_clean <- vape_dat_clean %>% 
   mutate(vape_6mo = case_when(last_vape < 5 | last_vape > 8 ~ TRUE,
                               last_vape %in% c(5,6,7,8) ~ FALSE,
-                              ever_vape == 0 & is.na(last_vape) ~ FALSE))
+                              ever_vape == 0 & is.na(last_vape) ~ FALSE,
+                              vape_days > 0 ~ TRUE))
 
 #Create labeled column for vaped in 6 mo
 vape_dat_clean <- vape_dat_clean %>% 
@@ -102,7 +109,7 @@ vape_dat_clean <- vape_dat_clean %>%
 
 #subset data for table1
 tab1_dat <- vape_dat_clean %>% 
-  select(sid, city, age, sex_lab, grade_lab, latino_lab, ever_vape_lab, vape_30_lab, vape_6mo_lab, fev1, fvc)
+  select(sid, recruitment_center, age, sex_lab, grade_lab, latino_lab, ever_vape_lab, vape_30_lab, vape_6mo_lab, fev1, fvc, r5, x20, fev1_fvc)
 
 #output csv
-write_csv(tab1_dat, here('DataProcessed/table1_clean_data_yyyy_mm_dd.csv'))
+# write_csv(tab1_dat, here('DataProcessed/metadata_cleaning/table1_clean_data_yyyy_mm_dd.csv'))

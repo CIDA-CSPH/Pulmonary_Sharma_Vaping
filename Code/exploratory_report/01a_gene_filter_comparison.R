@@ -69,7 +69,7 @@ filter_range_test <- zero_count_.75_filtered %>%
   apply(.,1, function(x) (max(x) - min(x)))
 
 #Set a range of thresholds
-range_to_test <- seq(50,500,10)
+range_to_test <- seq(50,200,10)
 
 #Apply the range of thresholds
 genes_removed <- t(sapply(filter_range_test, function(x) x <= range_to_test)) %>% 
@@ -80,9 +80,16 @@ genes_removed <- t(sapply(filter_range_test, function(x) x <= range_to_test)) %>
 range_test_mat <- tibble(range = range_to_test,
                          genes_removed = genes_removed)
 
+#Make subset for cutoff used
+cutoff_used <- range_test_mat %>% 
+  filter(range == 100)
+
 #Show cutoffhow to 
 range_cutoff <- range_test_mat %>% 
   ggplot(aes(x = range, y = genes_removed)) +
   geom_point() + 
-  geom_hline(yintercept = 14678, color = 'red', linetype = 'dashed') +
-  labs(x = "Range Threshold", y = "Genes Removed")
+  geom_point(data = range_test_mat %>% filter(range == 100), 
+             aes(color = 'Cutoff Used')) +
+  geom_text(data = range_test_mat %>% filter(range == 100), label = "14678", vjust = -1, color = 'red') +
+  labs(x = "Range Threshold", y = "Genes Removed", title = "Genes Removed for Range Filter Cutoff", color = "Legend")
+
