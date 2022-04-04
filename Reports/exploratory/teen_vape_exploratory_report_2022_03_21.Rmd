@@ -1,0 +1,460 @@
+---
+title: Metadata Exploratory Report
+author: |
+ | Project: `r CIDAtools::ProjectName()`
+ |
+ | Analyst: `r CIDAtools::ProjectAnalyst()`
+ |
+ | Investigator(s): `r CIDAtools::ProjectPI()`
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+
+output:
+  html_document:
+    highlight: espresso
+    number_sections: no
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    code_folding: hide
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+------------------------------------------------------------------------
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(arsenal)
+library(here)
+library(readr)
+library(coin)
+library(latex2exp)
+library(ggpubr)
+library(DESeq2)
+library(RUVSeq)
+library(janitor)
+library(dendextend)
+library(WGCNA)
+```
+
+```{r import data, include=FALSE}
+#import data
+tab1_dat <- read_csv(here("DataProcessed/metadata_cleaning/table1_clean_data_2022_03_02.csv"))
+
+tab1_dat$grade <- as_factor(tab1_dat$grade)
+
+#filter out 1 NA for vape status
+tab1_dat <- tab1_dat %>% 
+  filter(!is.na(vape_6mo_lab))
+
+```
+
+# Background
+
+The data presented in this report are part of a study aimed to assess differential gene expression and methylation in vaping versus non-vaping LatinX youths in Pueblo and Denver, CO. Pulmonary function data were also obtained in order to better understand the impacts of vape use on pulmonary function. To assess differential gene expression and methylation, naso-epithelial swabs were obtained from each participating subject. Pulmonary function is assessed using PFTs (Pulmonary Function Tests) and Impulse Oscillometry (IOS).
+
+# Study Population
+
+This data set consists of samples taken from 51 people ages 12-17 yrs from the Pueblo, Denver, and Aurora, CO areas. Vape Status (did you vape in the last 6 months?) and ethnicity are self-reported.
+
+# Methods
+
+*All analyses performed using `r R.version$version.string`*
+
+## Clinical Data Pocessing
+
+### *Vape Status*
+
+Subjects are dichotomized to those that used a vaping device in the last 6 months and those who have not based on the variables *ever_vape*, *vape_days*, and *last_vape*. This variable will be referred to as *Vape Status* throughout this report. One participant (SID = 111) reported that they had used a vaping device 5 out of the last 30 days, but did not respond to *last_vape*. They were labeled as "NA" in previous analyses.
+
+### *Sex*
+
+Biological sex will need to be identified using available genomic data.
+
+### *Geographic Location*
+
+Subjects' geographic location, *city*, was grouped into the new broader variable *recruiting_center* which encompasses the broader geographic region where they live.
+
+### *Lung Function and IOS*
+
+Measures of lung function and IOS were visually inspected for normality using histograms.
+
+## Gene-Count Processing
+
+*Annotation: Ensembl annotation for GrCH 39 ver. 37*\
+*Differential Expression Analysis: DESeq2 `r package.version("DESeq2")`*\
+*Removal of Unwanted Variance: RUVSeq `r package.version("RUVSeq")` and edgeR `r package.version("edgeR")`*
+
+*Gene Filtering Parameters*\
+This analysis will conduct a comparison of various gene-filtering parameters presented in previous analyses and in the current literature to select parameters best-suited for this study.
+
+*Normalization*\
+The following analyses used the function RUVr from the R package RUVSeq. RUVr uses the deviance residuals from a first pass negative binomial GLM to perform a factor analysis which corrects for unwanted technical effects. The first-pass model formula is presented below :
+
+$$raw \ read \ count \sim \beta_0 + \beta_1 * vape \ status \ + \beta_2 *male \ + \beta_3 * latinx$$
+
+RUVr will be performed with k = 1 through k = 5 factors and the best cutoff for factor analysis will be determined visually using RLE plots and dendrograms for each level k. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
+
+*Transformations*\
+A variance stabilizing transformation (VST) was applied in previous analyses. This analysis will use the same transformation, but will apply the transformation only after normalization.
+
+# Results
+
+After removing participants with missing values for *vape status*, we are left with **n = 50** subjects. Previous analyses showed **n = 12** participants had vaped in the last 6 months. This analysis will use **n = 13** participants who had vaped in the last 6 months. The lung function variable *`r colnames(tab1_dat[,12])`* and *`r colnames(tab1_dat[,13])`* reported 22 missing values. IOS measures *`r colnames(tab1_dat[,14])`* and *`r colnames(tab1_dat[,15])`* reported 1 and 6 missing values, respectively.
+
+*Table 1: Clinical Data*
+
+```{r Table 1, message=FALSE, results='asis', echo=TRUE}
+
+#create table 1
+vape_6mo_table1 <- tab1_dat %>% 
+  tableby(vape_6mo_lab ~ gender_lab + age + recruitment_center + 
+            latino_lab + fev1 + fev1_fvc + 
+            r5 + x20, data = ., digits = 1, test = FALSE )
+
+#Fix Labels
+arsenal::labels(vape_6mo_table1) <- c(vape_6mo_lab = "Vaped in last 6 months", 
+                             age = "Age (yrs)", gender_lab = "Gender", 
+                             recruitment_center = "Recruitment Center", 
+                             latino_lab = "Ethnicity", fev1 = 'FEV1',
+                             fev1_fvc = "FEV1/FVC (%)", r5 = 'R5', x20 = 'X20')
+
+#Print Tables
+summary(vape_6mo_table1, pfootnote = T)
+```
+
+```{r figures, echo=TRUE, message=FALSE, warning=FALSE}
+#Fix Gender Bar Plot
+gender_plot_trial <- tab1_dat %>% 
+  group_by(gender_lab, vape_6mo_lab) %>% 
+  summarise(N = n())
+
+gender_plot_trial[nrow(gender_plot_trial) + 1,] <- NA
+
+gender_plot_trial[6,] <- list("Non-Binary", "Vaped in Last 6 Months", 0)
+
+
+#By Recruitment gender (n = 50)
+bar_gender <- gender_plot_trial %>% 
+  ggplot(aes(x = gender_lab, y = N, fill = vape_6mo_lab)) + 
+  geom_bar(stat = 'identity', position = 'dodge') +
+  labs(x = "Gender", y = "Count", fill = "Vape Status") + 
+  ggtitle("Gender")
+
+#By Latino(n = 50)
+bar_latino <- tab1_dat %>% 
+  ggplot(aes(x = latino_lab, fill = vape_6mo_lab))+
+  geom_bar(position = "dodge")+
+  labs(x = "Ethnicity", y = "Count", fill = "Vape Status") +
+  ggtitle("LatinX")
+
+#Fix Recruitment Center Bar Plot
+center_plot_trial <- tab1_dat %>% 
+  group_by(recruitment_center, vape_6mo_lab) %>% 
+  summarise(N = n())
+
+center_plot_trial[nrow(center_plot_trial) + 1,] <- NA
+
+center_plot_trial[6,] <- list("Aurora", "Vaped in Last 6 Months", 0)
+
+#By Recruitment Center
+recruitment_center_hist <- center_plot_trial %>% 
+  ggplot(aes(x = recruitment_center, y = N, fill = vape_6mo_lab)) + 
+  geom_bar(stat = 'identity', position = 'dodge') +
+  labs(x = "Center", y = "Count", fill = "Vape Status") + 
+  ggtitle("Center")
+
+
+#By FEV1/FVC Continuous
+hist_fev1_fvc <- tab1_dat %>%
+  ggplot(aes(x = fev1_fvc, fill = vape_6mo_lab))+
+  geom_histogram(binwidth = 0.1, breaks = seq(0.5,1,0.1), position = "dodge")+
+  labs(x = TeX("\\frac{FEV1}{FVC}"), y = "Count", fill = "Vape Status:") +
+  xlim(0.5,1) + 
+  ggtitle("FEV1/FVC")
+
+#By FEV1/FVC Box
+box_fev1_fvc <- tab1_dat %>%
+  ggplot(aes(x = vape_6mo_lab, y = fev1_fvc, fill = vape_6mo_lab)) +
+  geom_boxplot(show.legend = F) +
+  labs(x = "Vape Status", y = TeX("\\frac{FEV1}{FVC}")) +
+  ggtitle(TeX("\\frac{FEV1}{FVC} \ by Vape Status (n = 28)"))
+
+#By R5(hist)
+r5_hist <- tab1_dat %>%
+  ggplot(aes(x = r5, fill = vape_6mo_lab)) +
+  geom_histogram(binwidth = 1, breaks = seq(1,8,1), position = 'dodge') +
+  labs(x = "R5", y = "Count", fill = "Vape Status") +
+  xlim(1,8) +
+  ggtitle("R5")
+
+#by R5(box)
+r5_box <- tab1_dat %>%
+  ggplot(aes(x = vape_6mo_lab, y = r5, fill = vape_6mo_lab)) +
+  geom_boxplot(show.legend = F) +
+  labs(x = "Vape Status", y = "R5") +
+  ggtitle("R5 by Vape Status (n = 49)")
+
+#by X20(box)
+x20_box <- tab1_dat %>%
+  ggplot(aes(x = vape_6mo_lab, y = x20, fill = vape_6mo_lab)) +
+  geom_boxplot(show.legend = F) +
+  labs(x = "Vape Status", y = "X20") +
+  ggtitle("X20 by Vape Status (n = 44)")
+
+#by x20(his)
+x20_hist <- tab1_dat %>%
+  ggplot(aes(x = x20, fill = vape_6mo_lab)) +
+  geom_histogram(bins = 10, breaks = seq(-2,3,1), position = "dodge") +
+  labs(x = 'X20', y = "Count", fill = 'Vape Status') +
+  ggtitle("X20")
+
+```
+
+*Figure 1: Population Demographics*
+
+Figure 1 visualizes the demographic information presented in Table 1. The majority of vaping subjects were recruited in Pueblo (92%) and identified as LatinX (85%). 62% of vapers identified as male.
+
+```{r Demographic Figure, include=T, fig.height=6, fig.width=9}
+#Demographic Figures
+ggarrange(recruitment_center_hist, ggarrange(bar_gender, bar_latino, ncol = 2, nrow = 1, legend = "none"), nrow = 2, common.legend = T, legend = "bottom")
+```
+
+*Figure 2: Pulmonary Function*
+
+Figure 2 is a visualization of the pulmonary function ($\frac{FEV1}{FVC}$) and IOS (*R5* and *X20*) variables. $\frac{FEV1}{FVC}$ was only completed by **n = 22** individuals from the study population. *R5* and *X20* represent **n = 49** and **n = 44** individuals, respectively.
+
+```{r Respiratory Figure, echo=T, fig.height=6, fig.width=8, message=FALSE, warning=FALSE, include=TRUE}
+#Respiratory Figures
+ggarrange(hist_fev1_fvc, ggarrange(r5_box, x20_box, ncol = 2, nrow = 1, legend = "none"), nrow = 2, common.legend = T, legend = "bottom")
+```
+
+*Table 2: Comparison of Gene Filtering Parameters*
+
+The table below compares gene-filtering parameters from previous analyses to a parameter presented by the creators of the RUVseq package. The previous analysis used Filters 1 and 2, sequentially, and conducted analysis of 14645 genes. This analysis will use Filter 3 and conduct analysis of 29141 genes.
+
+
+```{r gene_compare_table, echo=TRUE, message=FALSE, warning=FALSE}
+#read in raw gene counts
+raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
+
+#table to store results
+gene_filter_mat <- matrix(nrow = 3, ncol = 4)
+
+colnames(gene_filter_mat) <- c("Inclusion Criteria", 
+                               "Read Count Before", 
+                               "Read Count After", 
+                               "Reads Removed")
+
+gene_filter_mat[,1] <- c("At least 25% of the samples have > 0 reads",
+                         "The range of reads across all samples > 100", 
+                         ">=5 reads in at least 2 samples (Bioconductor)")
+
+#remove all genes with 0 counts
+filter_0_count <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) sum(x) == 0)
+
+
+zero_genes_filtered <- raw_gene_count[!filter_0_count,]
+
+#remove all genes with 0 counts in 75% or more of samples
+filter_0_.75_count <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) sum(x == 0) <= 49*.75)
+
+
+zero_count_.75_filtered <- raw_gene_count[filter_0_.75_count,]
+
+#remove all genes with range <= 100
+filter_range_100 <- zero_count_.75_filtered %>% 
+  select(-Feature) %>% 
+  apply(.,1, function(x) (max(x) - min(x)) >= 100)
+
+range_100_filtered <- zero_count_.75_filtered[filter_range_100,]
+
+
+#Bioconductor suggested filter (at least two samples with > 5 counts)
+filter <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) length(x[x>5])>=2)
+
+bioconductor_filter <- raw_gene_count[filter,]
+
+gene_count_after <- c(nrow(zero_count_.75_filtered), nrow(range_100_filtered), nrow(bioconductor_filter))
+
+gene_filter_mat[,2] <- c(nrow(raw_gene_count), nrow(zero_count_.75_filtered), nrow(raw_gene_count))
+
+gene_filter_mat[,3] <- gene_count_after
+
+gene_filter_mat[,4] <- c(sum(!filter_0_.75_count), sum(!filter_range_100), sum(!filter))
+
+gene_filter_tib <- as_tibble(gene_filter_mat) %>% 
+  filter(gene_filter_mat[,3] != 46356) %>% 
+  mutate(Filter = c(1,2,3), "Analysis Used" = c("Previous", "Previous", "Current")) %>% 
+  select(Filter, "Analysis Used", everything())
+
+kbl(gene_filter_tib, booktabs = T, digits = 3) %>%
+  kable_styling(position = "center", latex_options = c("striped", "hold_position"))
+```
+
+*Figure 3: Relative Log Expression Prior to RUV*
+
+The following figure shows the Relative Log Expression (RLE) of read counts for each sample without the use of RUVr or any other transformation technique.
+
+```{r ruvr, echo=TRUE, fig.width= 10, message=FALSE, warning=FALSE}
+#read in raw gene counts
+raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
+
+
+#Bioconductor suggested filter
+filter <- raw_gene_count %>% 
+  select(-Feature) %>% 
+  apply(., 1, function(x) length(x[x>5])>=2)
+
+filtered_gene_count <- raw_gene_count[filter,]
+
+#convert gene count matrix
+filtered_gene_count <- as.data.frame(filtered_gene_count)
+rownames(filtered_gene_count) <- filtered_gene_count[,1]
+filtered_gene_count <- filtered_gene_count[,-1]
+
+#create a list of genes
+genes <- rownames(filtered_gene_count)[grep("^ENS", rownames(filtered_gene_count))]
+
+#Filter out Sample23(no vape status)
+filtered_gene_count <- filtered_gene_count %>% 
+  select(-Sample23)
+
+##Prepare for RUV
+
+#Load metadata
+id_relate <- read_tsv(file = here("DataRaw/20201216_coreID_to_PID.txt"), col_names = T) %>%
+  clean_names()
+metadata_unjoined <- read_csv(file = here("DataProcessed/metadata_cleaning/table1_clean_data_2022_03_02.csv"))
+
+#Join metadata
+metadata_joined <- id_relate %>% 
+  mutate(new_id = str_pad(new_id, 2, "left", "0") %>% paste0("Sample", .)) %>% 
+  left_join(metadata_unjoined, by = "sid") %>% 
+  filter(new_id %in% names(filtered_gene_count))
+
+#Set up factors properly
+metadata_joined$male_lab <- factor(metadata_joined$male_lab, 
+                                   levels = c("Not Male", "Male"))
+metadata_joined$vape_6mo_lab <- factor(metadata_joined$vape_6mo_lab, 
+                                       levels = c("Did Not Vape in Last 6 Months", "Vaped in Last 6 Months"))
+metadata_joined$latino_lab <- factor(metadata_joined$latino_lab, 
+                                     levels = c("Non-LatinX", "LatinX"))
+
+#Filter out the subject with missing vape status
+metadata_joined <- metadata_joined %>% 
+  filter(new_id != 'Sample23')
+
+#make easier to reference
+vape_status <- metadata_joined$vape_6mo_lab
+
+male <- metadata_joined$male_lab
+
+latinx <- metadata_joined$latino_lab
+
+#convert to SEqExpressionSet object
+ruv_prep <- newSeqExpressionSet(as.matrix(filtered_gene_count), 
+                                phenoData = data.frame(vape_status, 
+                                                       male, 
+                                                       latinx, 
+                                                       row.names = metadata_joined$new_id))
+
+
+#Look at raw sample
+par(mfrow = c(1,1))
+plotRLE(ruv_prep, outline=FALSE, ylim=c(-4, 4))
+```
+
+To visually inspect for the best cutoff for factor analysis, RUVr was run for k = 1 through k = 5 factors. The RLE plots for k = 3 through k = 5 are presented below.
+
+```{r RUVr Continues, echo=TRUE, message=FALSE, warning=FALSE, fig.height=8, fig.width= 10}
+##Get the residuals matrix
+#Design Matrix
+design <- model.matrix(~ vape_status + male + latinx, data = pData(ruv_prep))
+#get library size for each sample
+ruv_counts <- DGEList(counts = counts(ruv_prep), group = vape_status)
+#get commen negative binomial dispersion factor
+ruv_counts <- estimateGLMCommonDisp(ruv_counts, design = design)
+#fit log-linear negative binomial generalized model to the read counts for each gene
+first_pass <- glmFit(ruv_counts, design = design)
+#get the residuals from that model
+first_pass_residuls <- residuals(first_pass, type="deviance")
+
+## Run RUVr
+#K = 1
+ruv_k1 <- RUVr(ruv_prep, cIdx = genes, k = 1, residuals = first_pass_residuls)
+
+#K = 2
+ruv_k2 <- RUVr(ruv_prep, cIdx = genes, k = 2, residuals = first_pass_residuls)
+
+#K = 3
+ruv_k3 <- RUVr(ruv_prep, cIdx = genes, k = 3, residuals = first_pass_residuls)
+
+#K = 4
+ruv_k4 <- RUVr(ruv_prep, cIdx = genes, k = 4, residuals = first_pass_residuls)
+
+#K = 5
+ruv_k5 <- RUVr(ruv_prep, cIdx = genes, k = 5, residuals = first_pass_residuls)
+
+
+#Make nicer plot
+par(mfrow=c(3,1), cex = 0.5, cex.lab = 1.5, mar=c(2,5,0.5,0))
+
+plotRLE(ruv_k3, outline=FALSE, ylim=c(-1, 1), ylab = "k = 3")
+abline(h = c(0.5, -0.5), col = c("red", "red"))
+
+plotRLE(ruv_k4, outline=FALSE, ylim=c(-1, 1), ylab = "k = 4")
+abline(h = c(0.5, -0.5), col = c("red", "red"))
+
+plotRLE(ruv_k5, outline=FALSE, ylim=c(-1, 1), ylab = "k = 5")
+abline(h = c(0.5, -0.5), col = c("red", "red"))
+
+```
+
+The dendrograms for k = 4 and k = 5 are compared below. 
+
+```{r}
+#Make Dendrograms
+calDend <- function(x){ 
+  hc <- hclust(as.dist(1-bicor(normCounts(x))))
+  hc$labels <- as.factor(str_replace(hc$labels, "_", "."))
+  hcd <- as.dendrogram(hc)
+  return(hcd)
+}
+
+par(mfrow=c(2,1), cex = 0.5, cex.lab = 1.5, las = 3, mar=c(4.5,5,0.5,0))
+plot(calDend(ruv_k4), ylab = "k=4", cex.axis = 1.5)
+plot(calDend(ruv_k5), ylab = "k=5", cex.axis = 1.5)
+```
+
+# Notes
+
+-   I have redone RUVSeq. I will need Cheyret's help diagnosing which 'K' is best.
+-   I would like to discuss the comparison of different gene-filtering methods to figure out what constitutes a "best" method.
+
+# Questions
+
+-   Does Sunita have the V1 of Choo's last report? (20210412_Vaping_RNASeq_Results_v2)
+-   I have not yet been able to fiind an explanation for why Choo used the filters presented in table 2. Katerina, are these filtering parameters reasonable to you? 
+
+<!-- footer -->
+
+------------------------------------------------------------------------
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```
