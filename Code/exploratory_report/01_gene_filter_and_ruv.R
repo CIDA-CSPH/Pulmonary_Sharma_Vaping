@@ -73,7 +73,7 @@ male <- metadata_joined$sex_lab
 
 latinx <- metadata_joined$latino_lab
 
-#convert to SEqExpressionSet object
+#convert to SEqExpressionSet object WITHOUT Center
 ruv_prep <- newSeqExpressionSet(as.matrix(filtered_gene_count), 
                                 phenoData = data.frame(vape_status, 
                                                        male, 

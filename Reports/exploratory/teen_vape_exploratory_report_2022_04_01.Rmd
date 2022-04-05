@@ -28,6 +28,7 @@ knitr::include_graphics(logo)
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE)
+library(RColorBrewer)
 library(tidyverse)
 library(knitr)
 library(kableExtra)
@@ -42,6 +43,7 @@ library(RUVSeq)
 library(janitor)
 library(dendextend)
 library(WGCNA)
+library(minfi)
 ```
 
 ```{r import data, include=FALSE}
@@ -74,7 +76,7 @@ Subjects are dichotomized to those that used a vaping device in the last 6 month
 
 ### *Sex*
 
-Biological sex will need to be identified using available genomic data.
+Biological sex has been derived from methylation data utilizing the getSex function from the R package *minfi `r package.version("minfi")`*.
 
 ### *Geographic Location*
 
@@ -96,9 +98,9 @@ This analysis will conduct a comparison of various gene-filtering parameters pre
 *Normalization*\
 The following analyses used the function RUVr from the R package RUVSeq. RUVr uses the deviance residuals from a first pass negative binomial GLM to perform a factor analysis which corrects for unwanted technical effects. The first-pass model formula is presented below :
 
-$$raw \ read \ count \sim \beta_0 * vape \ status \ + \beta_1 *male \ + \beta_2 * latinx$$
+$$raw \ read \ count \sim \beta_0 + \beta_1 * vape \ status \ + \beta_2 *male \ + \beta_3 * latinx$$
 
-RUVr will be performed with k = 1 through k = 5 factors and the best cutoff for factor analysis will be determined visually using RLE plots and dendrograms for each level k. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
+RUVr will be performed with k = 1 through k = 5 factors and the best k for factor analysis will be determined visually using an elbow plot, RLE plots, and dendrograms. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
 
 *Transformations*\
 A variance stabilizing transformation (VST) was applied in previous analyses. This analysis will use the same transformation, but will apply the transformation only after normalization.
@@ -139,15 +141,19 @@ sex_plot_trial <- tab1_dat %>%
 bar_sex <- sex_plot_trial %>% 
   ggplot(aes(x = sex_lab, y = N, fill = vape_6mo_lab)) + 
   geom_bar(stat = 'identity', position = 'dodge') +
-  labs(x = "Sex", y = "Count", fill = "Vape Status") + 
-  ggtitle("Sex")
+  labs(y = "Count", fill = "Vape Status") + 
+  ggtitle("Sex") +
+  scale_fill_manual(values = brewer.pal(3, "Set2"))+
+  theme(axis.title.x=element_blank())
 
 #By Latino(n = 50)
 bar_latino <- tab1_dat %>% 
   ggplot(aes(x = latino_lab, fill = vape_6mo_lab))+
   geom_bar(position = "dodge")+
-  labs(x = "Ethnicity", y = "Count", fill = "Vape Status") +
-  ggtitle("LatinX")
+  labs( y = "Count", fill = "Vape Status") +
+  ggtitle("LatinX") +
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
+  theme(axis.title.x=element_blank())
 
 #Fix Recruitment Center Bar Plot
 center_plot_trial <- tab1_dat %>% 
@@ -162,8 +168,10 @@ center_plot_trial[6,] <- list("Aurora", "Vaped in Last 6 Months", 0)
 recruitment_center_hist <- center_plot_trial %>% 
   ggplot(aes(x = recruitment_center, y = N, fill = vape_6mo_lab)) + 
   geom_bar(stat = 'identity', position = 'dodge') +
-  labs(x = "Center", y = "Count", fill = "Vape Status") + 
-  ggtitle("Center")
+  labs(y = "Count", fill = "Vape Status") + 
+  ggtitle("Center")+
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
+  theme(axis.title.x=element_blank())
 
 
 #By FEV1/FVC Continuous
@@ -172,6 +180,7 @@ hist_fev1_fvc <- tab1_dat %>%
   geom_histogram(binwidth = 0.1, breaks = seq(0.5,1,0.1), position = "dodge")+
   labs(x = TeX("\\frac{FEV1}{FVC}"), y = "Count", fill = "Vape Status:") +
   xlim(0.5,1) + 
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
   ggtitle("FEV1/FVC")
 
 #By FEV1/FVC Box
@@ -179,6 +188,7 @@ box_fev1_fvc <- tab1_dat %>%
   ggplot(aes(x = vape_6mo_lab, y = fev1_fvc, fill = vape_6mo_lab)) +
   geom_boxplot(show.legend = F) +
   labs(x = "Vape Status", y = TeX("\\frac{FEV1}{FVC}")) +
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
   ggtitle(TeX("\\frac{FEV1}{FVC} \ by Vape Status (n = 28)"))
 
 #By R5(hist)
@@ -187,6 +197,7 @@ r5_hist <- tab1_dat %>%
   geom_histogram(binwidth = 1, breaks = seq(1,8,1), position = 'dodge') +
   labs(x = "R5", y = "Count", fill = "Vape Status") +
   xlim(1,8) +
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
   ggtitle("R5")
 
 #by R5(box)
@@ -194,27 +205,34 @@ r5_box <- tab1_dat %>%
   ggplot(aes(x = vape_6mo_lab, y = r5, fill = vape_6mo_lab)) +
   geom_boxplot(show.legend = F) +
   labs(x = "Vape Status", y = "R5") +
-  ggtitle("R5 by Vape Status (n = 49)")
+  ggtitle("R5 by Vape Status (n = 49)") +
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
 
 #by X20(box)
 x20_box <- tab1_dat %>%
   ggplot(aes(x = vape_6mo_lab, y = x20, fill = vape_6mo_lab)) +
   geom_boxplot(show.legend = F) +
   labs(x = "Vape Status", y = "X20") +
-  ggtitle("X20 by Vape Status (n = 44)")
+  ggtitle("X20 by Vape Status (n = 44)") +
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
+  theme(axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
 
 #by x20(his)
 x20_hist <- tab1_dat %>%
   ggplot(aes(x = x20, fill = vape_6mo_lab)) +
   geom_histogram(bins = 10, breaks = seq(-2,3,1), position = "dodge") +
   labs(x = 'X20', y = "Count", fill = 'Vape Status') +
+  scale_fill_manual(values = brewer.pal(3, "Set2")) +
   ggtitle("X20")
 
 ```
 
 *Figure 1: Population Demographics*
 
-Figure 1 visualizes the demographic information presented in Table 1. The majority of vaping subjects were recruited in Pueblo (92%) and identified as LatinX (85%). 62% of vapers identified as male.
+Figure 1 visualizes the demographic information presented in Table 1. The majority of vaping subjects were recruited in Pueblo (92%) and identified as LatinX (85%). 62% of subjects were male as confirmed from the available methylation data.
 
 ```{r Demographic Figure, include=T, fig.height=6, fig.width=9}
 #Demographic Figures
@@ -260,7 +278,6 @@ The following figure shows the Relative Log Expression (RLE) and Principal Compo
 source(here("Code/exploratory_report/01_gene_filter_and_ruv.R"), local = knitr::knit_global())
 
 #Look at raw sample
-library(RColorBrewer)
 colors <- brewer.pal(3,"Set2")
 par(mfrow = c(2,1))
 
@@ -276,10 +293,10 @@ It appears that Sample 12 (SID = 102) may be an outlier. Below are the RLE and P
 
 ```{r, message=FALSE, warning=FALSE,fig.height=8, fig.width= 10}
 par(mfrow = c(2,1))
-plotRLE(ruv_ready, outline=FALSE, ylim=c(-4, 4), col = colors[metadata_joined$vape_6mo_lab] )
+plotRLE(ruv_ready, outline=FALSE, ylim=c(-4, 4), col = colors[metadata_joined_no12$vape_6mo_lab] )
 legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 
-plotPCA(ruv_ready, col = colors[metadata_joined$vape_6mo_lab])
+plotPCA(ruv_ready, col = colors[metadata_joined_no12$vape_6mo_lab])
 legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 ```
 
@@ -299,23 +316,23 @@ To visually inspect for the best cutoff for factor analysis, RUVr was run for k 
 #Make nicer plot
 par(mfrow=c(5,1), cex = 0.5, cex.lab = 1.5, mar=c(2,5,0.5,0))
 
-plotRLE(ruv_k1, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 3")
+plotRLE(ruv_k1, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined_no12$vape_6mo_lab], ylab = "k = 1")
 abline(h = c(.5, -.5), col = c("red", "red"))
 legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 
-plotRLE(ruv_k2, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 3")
+plotRLE(ruv_k2, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined_no12$vape_6mo_lab], ylab = "k = 2")
 abline(h = c(.5, -.5), col = c("red", "red"))
 legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 
-plotRLE(ruv_k3, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 3")
+plotRLE(ruv_k3, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined_no12$vape_6mo_lab], ylab = "k = 3")
 abline(h = c(.5, -.5), col = c("red", "red"))
 legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 
-plotRLE(ruv_k4, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 4")
+plotRLE(ruv_k4, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined_no12$vape_6mo_lab], ylab = "k = 4")
 abline(h = c(.5, -.5), col = c("red", "red"))
 legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 
-plotRLE(ruv_k5, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined$vape_6mo_lab], ylab = "k = 5")
+plotRLE(ruv_k5, outline=FALSE, ylim=c(-1,1), col = colors[metadata_joined_no12$vape_6mo_lab], ylab = "k = 5")
 abline(h = c(.5, -.5), col = c("red", "red"))
 legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 
