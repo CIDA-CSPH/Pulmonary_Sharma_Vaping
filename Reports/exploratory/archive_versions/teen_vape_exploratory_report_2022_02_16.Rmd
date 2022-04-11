@@ -1,0 +1,71 @@
+---
+title: Metadata Exploratory Report
+author: |
+ | Project: `r CIDAtools::ProjectName()`
+ |
+ | Analyst: `r CIDAtools::ProjectAnalyst()`
+ |
+ | Investigator(s): `r CIDAtools::ProjectPI()`
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+output:
+  html_document:
+    highlight: espresso
+    number_sections: yes
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    code_folding: hide
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(arsenal)
+library(here)
+library(readr)
+```
+
+# Background
+
+Introduction text
+
+# Study Population
+
+# Methods
+
+# Descriptive Statistics
+
+*Table 1*
+```{r Table 1, message=FALSE, results='asis', echo=TRUE}
+#import data
+table1_dat <- read_csv(here("DataProcessed/metadata_cleaning/table1_clean_data_2022_02_18.csv"))
+
+#create table 1
+vape_6mo_table1 <- tableby(includeNA(vape_6mo_lab) ~ sex_lab + age + city + latino_lab + ever_vape_lab + vape_30_lab + fev1 + fvc, data = table1_dat, digits = 1)
+
+#Fix Labels
+labels(vape_6mo_table1) <- c(vape_6mo_lab = "Vaped in last 6 months", age = "Age", sex_lab = "Sex", city = "City", latino_lab = "Race", ever_vape_lab = "Have you vaped Before?", vape_30_lab = "Have you vaped in the last 30 days?", fev1 = "FEV1", fvc = "FVC")
+
+#Print Tables
+summary(vape_6mo_table1, pfootnote = T)
+```
+
+<!-- footer -->
+
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```
+

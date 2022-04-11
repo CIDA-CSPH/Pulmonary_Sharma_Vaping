@@ -113,3 +113,5 @@ tab1_dat <- vape_dat_clean %>%
 
 #output csv
 # write_csv(tab1_dat, here('DataProcessed/metadata_cleaning/table1_clean_data_yyyy_mm_dd.csv'))
+
+
