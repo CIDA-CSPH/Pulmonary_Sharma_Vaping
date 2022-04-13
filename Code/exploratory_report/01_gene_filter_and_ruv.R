@@ -138,6 +138,8 @@ first_pass_no12 <- glmFit(ruv_counts_no12, design = design_no12)
 first_pass_residuls <- residuals(first_pass, type="deviance")
 first_pass_residuls_no12 <- residuals(first_pass_no12, type="deviance")
 
+
+
 #Elbow Method for finding the optimal number of clusters
 set.seed(404)
 

@@ -5,6 +5,8 @@ library(readr)
 library(here)
 library(vcd)
 library(proxyC)
+library(janitor)
+library(rstatix)
 
 ###############################################################################################
 ##GET P-Value Histograms
@@ -76,7 +78,6 @@ cor_test_mat <- matrix(nrow = ncol(vars_of_interest), ncol = ncol(vars_of_intere
 
 Variable_1 <- vector()
 Variable_2 <- vector()
-test_type <- vector()
 
 #Get p-values for correlation between each variable
 for (i in variables) {
@@ -86,21 +87,10 @@ for (i in variables) {
     #Create a contingency table
     cont_tab <- base::table(vars_of_interest_mat[,i],vars_of_interest_mat[,j])
     #if there are small counts in the matrix, run Fisher's. Else run pearson's chisq
-    if (sum(apply(cont_tab, 2, function(x) sum(x < 5))) > 0) {
-      pval <- as.numeric(stats::fisher.test(cont_tab)[1])
-      cor_test_mat[i,j] <- pval
-      test_type <- base::append(test_type, "Fisher Exact")
-    }else{
-      pval <- as.numeric(stats::chisq.test(cont_tab)[3])
-      cor_test_mat[i,j] <- pval
-      test_type <- base::append(test_type, "Pearson Chisq")
+    pval <- as.numeric(stats::fisher.test(cont_tab)[1])
+    cor_test_mat[i,j] <- pval
     }
-    
-  }
 }
-#Get test_type for each test
-test_type_tracked <- as_tibble(cbind(Variable_1, Variable_2, test_type)) %>% 
-  mutate(test_type_match = paste0(Variable_1, ", ", Variable_2))
 
 
 #Get upper-triangular of matrix
@@ -114,23 +104,37 @@ cor_upper_tri <- get_upper_tri(cor_test_mat)
 library(reshape2)
 melted_cormat <- melt(cor_upper_tri, na.rm = T)
 
-#match up test_type for each test
 melted_cormat <- melted_cormat %>% 
-  dplyr::mutate(test_type_match = paste0(Var1, ", ", Var2))
+  filter(Var1 != Var2)
 
-test_type_matched <- test_type_tracked %>% 
-  filter(test_type_match %in% melted_cormat$test_type_match)
-
-melted_cormat <- left_join(melted_cormat, test_type_matched, by = "test_type_match")
-
-#  
-melted_cormat <- melted_cormat %>% 
-  select(-c(Variable_1, Variable_2, test_type_match))
 
 correlation_matrix_plot <- melted_cormat %>% 
-  ggplot(aes(x = Var2,y = Var1, fill = if_else(value < 0.05,"<0.05",">0.05"))) + 
+  ggplot(aes(x = Var2,y = Var1, fill = value)) + 
   geom_tile(color = "white") +
-  scale_x_discrete(labels = c("Vape Status", "Rectruitment Center", "LatinX", "Sex")) + 
-  scale_y_discrete(labels = c("Vape Status", "Rectruitment Center", "LatinX", "Sex")) +
-  geom_text(aes(label = test_type), color = "white") +
-  labs(fill = "Significance")
+  scale_x_discrete(labels = c("Rectruitment Center", "LatinX", "Sex")) + 
+  scale_y_discrete(labels = c("Vape Status", "Rectruitment Center", "LatinX")) +
+  geom_text(aes(label = round(value, 4)), color = "white") +
+  labs(fill = "P-Value")
+
+#complete t-tests to check for correlation between vape status 
+
+age_t_test_tab <- tab1_dat %>% 
+  select(sid,vape_6mo_lab, age) %>% 
+  filter(sid %in% metadata_joined$sid) %>% 
+  select(-sid) %>% 
+  mutate(vape_status = if_else(vape_6mo_lab == "Vaped in Last 6 Months", 1, 0))
+
+age_t_test <- t.test(age_t_test_tab$age~age_t_test_tab$vape_6mo_lab)
+
+
+age_report <- tibble("Test Variable" = "Age",
+                     "Group 1" = "Did Not Vape in Last 6 Months",
+                     "Group 2" = "Vaped in last 6 months",
+                     "Mean Group 1" = age_t_test$estimate[1],
+                     "Mean Group 2" = age_t_test$estimate[2],
+                     "T" = age_t_test$statistic,
+                     "df" = age_t_test$parameter,
+                     "p-value" = age_t_test$p.value
+                     )
+age_report_tab <- kable(age_report, digits = 3, booktabs = T) %>% 
+  kable_styling(latex_options = "striped")

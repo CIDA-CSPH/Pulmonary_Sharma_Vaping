@@ -73,7 +73,7 @@ This data set consists of samples taken from 51 people ages 12-17 yrs from the P
 
 ### *Vape Status*
 
-Subjects are dichotomized to those that used a vaping device in the last 6 months and those who have not based on the variables *ever_vape*, *vape_days*, and *last_vape*. This variable will be referred to as *Vape Status* throughout this report. One participant (SID = 111) reported that they had used a vaping device 5 out of the last 30 days, but did not respond to *last_vape*. They were labeled as "NA" in previous analyses.
+Subjects are dichotomized to those that used a vaping device in the last 6 months and those who have not based on the variables *ever_vape*, *vape_days*, and *last_vape*. This variable will be referred to as *Vape Status* throughout this report. One participant (SID = 111) reported that they had used a vaping device 5 out of the last 30 days, but did not respond to *last_vape*. That participant is recorded as *Vaped* in this analysis.
 
 ### *Sex*
 
@@ -90,8 +90,9 @@ Measures of lung function and IOS were visually inspected for normality using hi
 ## Gene-Count Processing
 
 *Annotation: Ensembl annotation for GrCH 39 ver. 37*\
+*Removal of Unwanted Variance: edgeR `r package.version("edgeR")` and RUVSeq `r package.version("RUVSeq")`*\
 *Differential Expression Analysis: DESeq2 `r package.version("DESeq2")`*\
-*Removal of Unwanted Variance: RUVSeq `r package.version("RUVSeq")`*
+
 
 *Gene Filtering Parameters*\
 This analysis will conduct a comparison of various gene-filtering parameters presented in previous analyses and in the current literature to select parameters best-suited for this study.
@@ -101,7 +102,7 @@ The following analyses used the function RUVr from the R package RUVSeq. RUVr us
 
 $$raw \ read \ count \sim \beta_0 + \beta_1 * vape \ status \ + \beta_2 *male \ + \beta_3 * latinx$$
 
-RUVr will be performed with k = 1 through k = 5 factors and the best k for factor analysis will be determined visually using an elbow plot, RLE plots, and dendrograms. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
+RUVr will be performed with k = 1 through k = 2 factors and the best k for factor analysis will be determined visually using an elbow plot, RLE plots, and dendrograms. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
 
 *Transformations*\
 A variance stabilizing transformation (VST) was applied in previous analyses. This analysis will use the same transformation, but will apply the transformation only after normalization.
@@ -253,14 +254,19 @@ ggarrange(hist_fev1_fvc, ggarrange(r5_box, x20_box, ncol = 2, nrow = 1, legend =
 
   
 ### Figure 3: Correlation Matrix  
-Figure 3 identifies correlation patterns in the clinical variables of interest. To test for correlation, a contingency table was made for each comparison of variables. If the table contained any cells with <5 subjects, a Fisher's Exact test was used; otherwise, a Pearson's Chisq test was run. 
+Figure 3 identifies correlation patterns in the clinical variables of interest. To test for correlation, a contingency table was made for each comparison of variables. because some contingency tables contained cells with <5 subjects, a Fisher's Exact test was used for all tests. 
 ```{r}
 source(here("Code/exploratory_report/01b_center_vape_correlation.R"), local = knitr::knit_global())
 
 correlation_matrix_plot
 ```
 
-From the correlation matrix, it appears that there may be significant correlation between vape status and recruitment center.   
+From the correlation matrix, it appears that there may be significant correlation between vape status and recruitment center. A separate t-test was run to determine independence between vape status and age.
+
+```{r}
+age_report_tab
+```
+
 
 ## Gene-Count Processing Results  
 
@@ -361,7 +367,7 @@ legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2
 To help additionally compare, the following are side-by-side PCA plots comparing samples with and without sample 12 removed before RUVr, after RUVr with k = 1, and after RUVr with k = 2.  
 
 ### Figure 10: PCA Comparison of RUVr Factor Inclusion
-```{r message=FALSE, warning=FALSE, fig.height=10, fig.width= 12}
+```{r message=FALSE, warning=FALSE, fig.height=12, fig.width= 12}
 #Make nicer plot
 par(mfrow=c(3,2), cex = .75)
 
@@ -389,7 +395,7 @@ plotPCA(ruv_k2_no12, col = colors[metadata_joined_no12$vape_6mo_lab], main = "Sa
 
 The dendrograms for k = 1 and k = 2 are compared below with and without Sample 12 included.  
 
-### Figure 11: Dendrogram Comparison of RUVr Factor Inclusion (Sample 12 in dataset)
+### Figure 11: Dendrogram Comparison of RUVr Factor Inclusion (k = 1 and k = 2) (Sample 12 in dataset)
 ```{r, fig.height= 6, fig.width=10}
 #Make Dendrograms
 calDend <- function(x){ 
@@ -426,7 +432,7 @@ legend(x = "topright", legend = c("Male", "Female"), fill = c(sex_colors[2], sex
 legend(x = "top", legend = c("Pueblo", "Denver", "Aurora"), fill = c(center_colors[3],center_colors[2], center_colors[1]), title = "Center")  
 ```
 
-### Figure 12: Dendrogram Comparison of RUVr Factor Inclusion (Sample 12 removed)
+### Figure 12: Dendrogram Comparison of RUVr Factor Inclusion (k = 1 and k = 2) (Sample 12 removed)
 ```{r fig.height= 6, fig.width=10}
 #assign color for each variable
 #vape status
@@ -451,7 +457,8 @@ legend(x = "topright", legend = c("Male", "Female"), fill = c(sex_colors[2], sex
 legend(x = "top", legend = c("Pueblo", "Denver", "Aurora"), fill = c(center_colors[3],center_colors[2], center_colors[1]), title = "Center")  
 ```
 
-#Notes
+
+# Notes
 
 - Between this report and it's previous version ("teen_vape_exploratory_report_2022_04_06"), a mistake was corrected in gene-filtering. The previous report incorrectly filtered out genes with range > 100. This report correctly filters out gens with range < 100, which makes for significant differences in visualization and reporting. 
 

@@ -1,12 +1,11 @@
 #load libraries
 library(tidyverse)
 library(readr)
+library(janitor)
 library(RUVSeq)
 library(here)
-library(janitor)
 library(DESeq2)
-library(dendextend)
-library(WGCNA)
+
 
 #read in raw gene counts
 raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
@@ -87,6 +86,8 @@ ruv_prep <- DESeqDataSetFromMatrix(countData = filtered_gene_count,
 
 DESeq_first_pass <- DESeq(ruv_prep)
 
+#extract the residuals
 
-vst_DESeq_first_pass <- vst(DESeq_first_pass)
+fitted.common.scale <- t(t(assays(DESeq_first_pass)[["mu"]])/sizeFactors(DESeq_first_pass))
 
+deseq_resid <- DESeq2::counts(DESeq_first_pass, normalized = T) - fitted.common.scale
