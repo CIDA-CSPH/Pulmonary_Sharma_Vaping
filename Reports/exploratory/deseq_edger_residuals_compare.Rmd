@@ -1,0 +1,116 @@
+---
+title: Differences in residuals produced by DESeq2 and edgeR
+author: |
+ | Project: `r CIDAtools::ProjectName()`
+ |
+ | Analyst: `r CIDAtools::ProjectAnalyst()`
+ |
+ | Investigator(s): `r CIDAtools::ProjectPI()`
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+output:
+  html_document:
+    highlight: espresso
+    number_sections: yes
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(table1)
+library(here)
+```
+
+# Background
+
+This mini-report is intended to help examine the differences in residuals produced using the 'R' packages 'DESeq2' and 'edgeR' in order to better understand work-flow methods to prepare raw read-count data for removal of unwanted variance using residuals (RUVr) from the package 'RUVSeq'. The data used for this analysis is from the study "Differential Gene Expression and Pulmonary Function in Vaping LatinX Adolescents". A thorough description of the data may be found in the "Exploratory Report". 
+
+# Methods
+Packages Used \:  
+*RUVSeq `r packageVersion("RUVSeq")`*\
+*DESeq2 `r packageVersion("DESeq2")`*\
+*edgeR `r packageVersion("edgeR")`*
+
+To quantify the difference in residuals for edgeR and DESeq2, this analysis will different workflows for edgeR and DESeq2, respectively. The 'RUVr' method from Bioconductor requires an input of a genes X samples matrix of deviance-residuals. While there is a straight-forward method for extracting this matrix from models created using edgeR, there is no straight-forward method for extracting these residuals from objects created using DESeq.
+
+## edgeR
+  A suitable workflow for extracting deviance residuals from edgeR is available from a report titled "RUVSeq: Remove Unwanted Variation from RNA-Seq Data" by the creators of RUVSeq (David Risso). This analysis follows the methods provided by the report. Methods are as follows\:  
+```{r message=FALSE, warning=FALSE, error=FALSE, echo=TRUE, eval=FALSE}
+#convert to SEqExpressionSet object WITHOUT Center
+ruv_prep <- newSeqExpressionSet(as.matrix(filtered_gene_count), 
+                                phenoData = data.frame(vape_status, 
+                                                       male, 
+                                                       latinx, 
+                                                       row.names = metadata_joined$id))
+##Get the residuals matrix
+#Design Matrix
+design <- model.matrix(~ vape_status + sex + latinx, data = pData(ruv_prep))
+#get library size for each sample
+ruv_counts <- DGEList(counts = counts(ruv_prep), group = vape_status)
+#get commen negative binomial dispersion factor
+ruv_counts <- estimateGLMCommonDisp(ruv_counts, design = design)
+#fit log-linear negative binomial generalized model to the read counts for each gene
+first_pass <- glmFit(ruv_counts, design = design)
+#get the residuals from that model
+first_pass_residuls <- residuals(first_pass, type="deviance")
+```
+  
+Please keep in mind that the variable names specified here have been simplified and do not exactly resemble the code used to produce this report.  
+
+## DESeq2
+To extract residuals from DESeq2, the normal workflow for DESeq was followed using the report provided by Love, et. al., "Analyzing RNA-seq data with DESeq2". After creating a DESeq object, the counts normalized by the "Variance Stabalizing Transformation" (VST) were extracted. Using the normalized read-counts, a linear model was fit for each gene and the pearson residuals of that model were extracted. Methods are as follows\:  
+
+```{r message=FALSE, warning=FALSE, error=FALSE, echo=TRUE, eval=FALSE}
+#Create DESeq Object
+design_ruv <- ~vape_status + sex + latinx
+
+ruv_prep <- DESeqDataSetFromMatrix(countData = filtered_gene_count,
+                                   colData = metadata_joined,
+                                   design = design_ruv) 
+#Run DESeq First Pass
+
+DESeq_first_pass_vst <- DESeq(ruv_prep) %>% vst() %>% assay()
+
+DESeq_Resid <-
+  DESeq_first_pass_vst %>%
+  apply(., 1, function(y) {
+    lm(y ~ vape_6mo_lab +
+         latino_lab + sex_lab,
+       data = metadata_joined) %>% resid()
+  })
+
+DESeq_Resid <- DESeq_Resid %>% t()
+```
+
+After extracting the residuals from both models, the residuals of the DESeq2 model were subtracted from the edgeR residuals, and the resulting differences were plotted.
+
+# Results
+The following are histograms in the differences in residuals for some random samples for the two methods described\:
+```{r message=FALSE, warning=FALSE, error=FALSE}
+source(here("Code/exploratory_report/01d_residuals_compare_edgeR_DESeq2.R"), local = knitr::knit_global())
+
+resid_diff_hist
+```
+
+It appears that the differences in residuals are centered around zero with maximum differences $\approx 5$ units. These histograms suggest that the two methods may be comprable.  
+<!-- footer -->
+
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```
+

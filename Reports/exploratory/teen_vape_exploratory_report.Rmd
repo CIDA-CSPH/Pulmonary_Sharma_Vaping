@@ -298,7 +298,7 @@ After reviewing the comparison of filters, it appears that filtering parameters 
 The following figure shows the Relative Log Expression (RLE) and Principal Component Analysis (PCA) of read counts for each sample without any prior transformations.
 
 ```{r, message=FALSE, warning=FALSE, fig.height=8, fig.width= 10}
-source(here("Code/exploratory_report/01_gene_filter_and_ruv.R"), local = knitr::knit_global())
+source(here("Code/exploratory_report/01_gene_filter_and_ruv_edgeR.R"), local = knitr::knit_global())
 
 #Look at raw sample
 colors <- brewer.pal(3,"Set2")
