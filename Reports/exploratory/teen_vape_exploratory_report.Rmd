@@ -100,7 +100,7 @@ This analysis will conduct a comparison of various gene-filtering parameters pre
 *Normalization*\
 The following analyses used the function RUVr from the R package RUVSeq. RUVr uses the deviance residuals from a first pass negative binomial GLM to perform a factor analysis which corrects for unwanted technical effects. The first-pass model formula is presented below :
 
-$$raw \ read \ count \sim \beta_0 + \beta_1 * vape \ status \ + \beta_2 *male \ + \beta_3 * latinx$$
+$$raw \ read \ count \sim \beta_0 + \beta_1 * vape \ status \ + \beta_2 *male \ + \beta_3 * age$$
 
 RUVr will be performed with k = 1 through k = 2 factors and the best k for factor analysis will be determined visually using an elbow plot, RLE plots, and dendrograms. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
 
@@ -256,7 +256,7 @@ ggarrange(hist_fev1_fvc, ggarrange(r5_box, x20_box, ncol = 2, nrow = 1, legend =
 ### Figure 3: Correlation Matrix  
 Figure 3 identifies correlation patterns in the clinical variables of interest. To test for correlation, a contingency table was made for each comparison of variables. because some contingency tables contained cells with <5 subjects, a Fisher's Exact test was used for all tests. 
 ```{r}
-source(here("Code/exploratory_report/01b_center_vape_correlation.R"), local = knitr::knit_global())
+source(here("Code/exploratory_report/01_variable_correlation.R"), local = knitr::knit_global())
 
 correlation_matrix_plot
 ```
@@ -278,7 +278,7 @@ After merging clinical metadata with gene-count data, there were **n = 47** samp
 The table below compares gene-filtering parameters from previous analyses to a parameter presented by the creators of the RUVseq package.
 
 ```{r gene_compare_table, echo=TRUE, message=FALSE, warning=FALSE}
-source(here("Code/exploratory_report/01a_gene_filter_comparison.R"), local = knitr::knit_global())
+source(here("Code/exploratory_report/02_gene_filter_comparison.R"), local = knitr::knit_global())
 
 filter_compar
 ```
@@ -291,14 +291,14 @@ The figure below is used to visually assess how many genes are removed across cu
 range_cutoff
 ```
 
-After reviewing the comparison of filters, it appears that filtering parameters presented by the creators of RUVSeq may be overly conservative for this application. Analyses will proceed using the same filters as previous analyses (filters 1 & 2 from table 2). The first filter will remove genes with 0 reads in more than 75% of samples, and the second will remove genes with low variation (range of reads < 100) that may be considered "house-keeping" genes. This analysis will include a total of **n = 16860** genes. 
+After reviewing the comparison of filters, it appears that filtering parameters presented by the creators of RUVSeq may be overly conservative for this application. Analyses will proceed using the same filters as previous analyses (filters 1 & 2 from table 2). The first filter will remove genes with 0 reads in more than 75% of samples, and the second will remove genes with low variation (range of reads < 100) that may be considered "house-keeping" genes. This analysis will include a total of **n = 16,860** genes. 
 
 ### Figure 5: Relative Loge Expression and Principal Component Analysis Prior to RUV
 
 The following figure shows the Relative Log Expression (RLE) and Principal Component Analysis (PCA) of read counts for each sample without any prior transformations.
 
 ```{r, message=FALSE, warning=FALSE, fig.height=8, fig.width= 10}
-source(here("Code/exploratory_report/01_gene_filter_and_ruv_edgeR.R"), local = knitr::knit_global())
+source(here("Code/exploratory_report/03_gene_filter_and_ruv_edgeR.R"), local = knitr::knit_global())
 
 #Look at raw sample
 colors <- brewer.pal(3,"Set2")
@@ -457,10 +457,11 @@ legend(x = "topright", legend = c("Male", "Female"), fill = c(sex_colors[2], sex
 legend(x = "top", legend = c("Pueblo", "Denver", "Aurora"), fill = c(center_colors[3],center_colors[2], center_colors[1]), title = "Center")  
 ```
 
+Using the figures above (with special attention towards Figure 10), It seems appropriate to **keep** sample 12 and use k = 2 factors for RUVr normalization. 
 
 # Notes
 
-- Between this report and it's previous version ("teen_vape_exploratory_report_2022_04_06"), a mistake was corrected in gene-filtering. The previous report incorrectly filtered out genes with range > 100. This report correctly filters out gens with range < 100, which makes for significant differences in visualization and reporting. 
+- Between this report and it's previous version ("teen_vape_exploratory_report_2022_04_15"), the variable LatinX was included in the model as opposed to the variable Age. This report corrects that mistake. Visually, it seems to make little differences in the figures used to select K.  
 
 <!-- footer -->
 

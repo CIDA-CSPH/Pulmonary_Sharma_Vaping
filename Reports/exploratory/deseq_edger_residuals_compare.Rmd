@@ -100,7 +100,7 @@ After extracting the residuals from both models, the residuals of the DESeq2 mod
 # Results
 The following are histograms in the differences in residuals for some random samples for the two methods described\:
 ```{r message=FALSE, warning=FALSE, error=FALSE}
-source(here("Code/exploratory_report/01d_residuals_compare_edgeR_DESeq2.R"), local = knitr::knit_global())
+source(here("Code/exploratory_report/03b_residuals_compare_edgeR_DESeq2.R"), local = knitr::knit_global())
 
 resid_diff_hist
 ```
