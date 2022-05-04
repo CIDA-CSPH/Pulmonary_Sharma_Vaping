@@ -55,6 +55,11 @@ metadata_joined <- metadata_joined %>%
 #Make sure the count data matches
 filtered_gene_count <- filtered_gene_count[,metadata_joined$new_id]
 
+filtered_gene_count_write <- filtered_gene_count %>% 
+  dplyr::mutate(Feature = base::rownames(filtered_gene_count)) %>% 
+  dplyr::select(Feature, everything())
+
+write_csv(filtered_gene_count_write, file = here("DataProcessed/filtered_gene_count_2022_05_04.csv"))
 
 ##Prepare for DESeq2
 #Set up factors properly

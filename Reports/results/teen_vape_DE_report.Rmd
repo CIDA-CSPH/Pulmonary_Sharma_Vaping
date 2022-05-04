@@ -1,5 +1,5 @@
 ---
-title: Metadata Exploratory Report
+title: Differential Expression Report
 author: |
  | Project: `r CIDAtools::ProjectName()`
  |
@@ -285,7 +285,12 @@ vape_center_counts <- read_csv(here("DataProcessed/de_output/vape_center_counts_
 vape_counts <- read_csv(here("DataProcessed/de_output/vape_counts_2022_05_01.csv"))
 center_counts <- read_csv(here("DataProcessed/de_output/center_counts_2022_05_01.csv"))
 ruv_counts <- read_csv(here("DataProcessed/RUV_k2_Counts_2022_05_01.csv"))
+gene_annotations <- read_tsv(here("DataRaw/gencode_annotations.txt"))
 
+gene_annotations_ruv <- gene_annotations[gene_annotations$ENSG %in% ruv_counts$gene,]
+
+#add symbol for ruv genes
+ruv_counts <- left_join(ruv_counts, gene_annotations_ruv, by = c("gene" = "ENSG"))
 #Fix vape status
 ruv_counts$vape_6mo_lab <- if_else(ruv_counts$vape_6mo_lab == "Did_Not_Vape_in_Last_6_Months", "Not Vaped", "Vaped")
 
@@ -337,7 +342,7 @@ ggarrange(vape_center_phist, vape_only_phist, center_only_phist, nrow = 1)
 
 To additionally check model results, Figures 6 - 8 box plots compare $\log_2$ transformed expression of the top 9 genes as indicated by the smallest FDR-adjusted p-values.  
 
-### Figures 6: $\log_2$ Expression of Top Genes (Vape Status and Center)
+### Figures 6: $\log_2$(Normalized Expression) of Top Genes (Vape Status and Center)
 ```{r fig.width=10, fig.height=8}
 ######################### Top Gene Boxplots ###############################
 
@@ -351,7 +356,7 @@ tcount_boxplot <- function(tcounts) {
     ggplot(aes(vape_6mo_lab, log2(expression), group = interaction(vape_6mo_lab, recruitment_center))) + 
     geom_boxplot(aes(fill = recruitment_center)) +
     geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
-    facet_wrap(~gene, scales="free_y") + 
+    facet_wrap(~symbol, scales="free_y") + 
     labs(x="", 
          y="Expression (log-normalized counts)", 
          fill="Center") +
@@ -366,7 +371,7 @@ tcount_boxplot <- function(tcounts) {
          y="Expression (log-normalized counts)", 
          fill = "Vape Status (6 mo)") +
     scale_fill_manual(values = vape_colors) +
-    facet_wrap(~gene, scales="free_y") +
+    facet_wrap(~symbol, scales="free_y") +
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank(),
           legend.position = "bottom")
@@ -377,7 +382,7 @@ tcount_boxplot <- function(tcounts) {
     geom_boxplot() +
     geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), 
               col = "Red") +
-    facet_wrap(~gene, scales="free_y") + 
+    facet_wrap(~symbol, scales="free_y") + 
     labs(x="Recruitment Center", 
          y="Expression (log-normalized counts)", 
          fill="Center") +
@@ -412,20 +417,20 @@ ggarrange(plotlist = list(vape_center_plots[[2]], vape_center_plots[[3]]), nrow 
 
 Stratifying by both Vape Status and Recruitment Center using the model results from *Vape and Center* (Figure 6) suggests that there is not a large difference between the groups specified. Additionally, Sample 12 has been highlighted again as a potential outlier that may be driving large variation in the group of vapers from Pueblo.
 
-### Figure 7: $\log_2$ Expression of Top Genes (Vape Status Only)
+### Figure 7: $\log_2$(Normalized Expression) of Top Genes (Vape Status Only)
 ```{r, fig.width= 10, fig.height= 8}
 ggarrange(plotlist = list(vape_plots[[2]], vape_plots[[3]]), nrow = 1)
 ```
   The plots for the *Vape Status Only* model has similary trends to the *Vape and Center* model. The *Center Only* model (Figure 8), however, detects some difference by recruitment center. While Sample 12 continues to look like an outlier for three of the top four genes, one (bottom-right) does not have Sample 12 as one of the most or least-expressed samples. 
   
-### Figure 8: $\log_2$ Expression of Top Genes (Center Only)
+### Figure 8: $\log_2$(Normalized Expression) of Top Genes (Center Only)
 ```{r fig.width= 10, fig.height= 8}  
 ggarrange(plotlist = list(center_plots[[2]], center_plots[[3]]), nrow = 1)
 ```
 
 The inclusion of the RUV factors in the selected models did not seem to correct the outlying nature of Sample 12 as the PCA and RLE plots (Figures 4 and 5) suggested. Figure 9 shows similar box plots to those displayed in figures 6 - 8 which use the normalized counts from RUVSeq to help assess Sample 12 as an outlier. Since RUVSeq does not test for gene significance, the same genes as the *Vape and Center* model (figure 6) are used. 
 
-### Figure 9: RUV-normalized expression for comparison
+### Figure 9: $\log_2$(RUV-Normalized) expression for comparison
 ```{r fig.width= 10, fig.height= 8}
 ggarrange(plotlist = list(ruv_plots[[2]], ruv_plots[[3]]), nrow = 1)
 ```

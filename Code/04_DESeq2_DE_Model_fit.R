@@ -1,25 +1,25 @@
 #Load libraries
+library(ggpubr)
 library(tidyverse)
 library(here)
 library(DESeq2)
 library(pcaExplorer)
 library(RColorBrewer)
-library(ggpubr)
 library(kableExtra)
-library(biomaRt)
 
 #read in files
-filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/filtered_gene_count_2022_04_20.csv")))
+filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/filtered_gene_count_2022_05_04.csv")))
 genes <- scan(file = here("DataProcessed/filtered_gene_list_2022_04_20.txt"), character(), quote = "")
 metadata_joined <- as.data.frame(read_csv(here("DataProcessed/metadata_joined_2022_04_20.csv")))
 ruv_factor_dat <- read_csv(here("DataProcessed/ruv_factor_data_k2_2022_04_20.csv"))
 ruv_counts<- read_csv(here("DataProcessed/RUV_k2_Counts_2022_05_01.csv")) 
 gene_annotations <- read_tsv(here("DataRaw/gencode_annotations.txt"))
 
-
-
 #fix rownames of filtered gene count
-rownames(filtered_gene_count) <- genes
+rownames(filtered_gene_count) <- filtered_gene_count$Feature
+
+filtered_gene_count <- filtered_gene_count %>% 
+  dplyr::select(-Feature)
 
 #join metadata with ruv factor data
 metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = "new_id", copy = T) %>% 
@@ -140,7 +140,10 @@ center_only_phist <- p_hist(center_res) +
 #fix metadata_joined vape status
 metadata_joined$vape_6mo_lab <- if_else(metadata_joined$vape_6mo_lab == "vaped", "Vaped", "Not Vaped")
 ######################### Get top genes and tidy results for plotting ###############################
-goi <- vape_center_res$row[1:4]
+gene_annotations <- gene_annotations %>% 
+  mutate(gene = ENSG) %>% 
+  select(gene, symbol)
+
 de_res_tidy <- function(run_de, de_res, col_data) {
   #Get top 4 genes of interest
   genes_of_interest <- de_res$row[1:4]
@@ -150,6 +153,10 @@ de_res_tidy <- function(run_de, de_res, col_data) {
                        normalized=TRUE, replaced=FALSE)+.5)) %>%
     merge(col_data, ., by="row.names") %>%
     gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
+  #add symbol name
+  gene_symbols <- gene_annotations[gene_annotations$gene %in% genes_of_interest,]
+  
+  tcounts <- left_join(tcounts, gene_symbols, by = "gene") 
   return(tcounts)
 }
 #Vape and Center
@@ -166,9 +173,9 @@ center_tcounts <- de_res_tidy(de_res = center_res,
                               col_data = metadata_joined)
 
 #write out files
-# write_csv(vape_center_tcounts, file = here("DataProcessed/de_output/vape_center_counts_2022_05_01.csv"))
-# write_csv(vape_tcounts, file = here("DataProcessed/de_output/vape_counts_2022_05_01.csv"))
-# write_csv(center_tcounts, file = here("DataProcessed/de_output/center_counts_2022_05_01.csv"))
+write_csv(vape_center_tcounts, file = here("DataProcessed/de_output/vape_center_counts_2022_05_01.csv"))
+write_csv(vape_tcounts, file = here("DataProcessed/de_output/vape_counts_2022_05_01.csv"))
+write_csv(center_tcounts, file = here("DataProcessed/de_output/center_counts_2022_05_01.csv"))
 
 ######################### Top Gene Boxplots ###############################
 #Fix labelling from metadata joined
