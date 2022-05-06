@@ -138,5 +138,5 @@ age_report <- tibble("Test Variable" = "Age",
                      "df" = age_t_test$parameter,
                      "p-value" = age_t_test$p.value
                      )
-age_report_tab <- kable(age_report, digits = 3, booktabs = T) %>% 
+age_report_tab <- kable(age_report, digits = 1, booktabs = T) %>% 
   kable_styling(latex_options = "striped")

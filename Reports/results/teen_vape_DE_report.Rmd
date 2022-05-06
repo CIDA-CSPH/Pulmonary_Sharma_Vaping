@@ -22,7 +22,7 @@ output:
 ```{r, echo=FALSE, out.width='70%', fig.show='hold'}
 logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
 knitr::include_graphics(logo)
-knitr::opts_chunk$set(warning = F, message = F, error = F, echo = T)
+knitr::opts_chunk$set(warning = F, message = F, error = F, echo = T, include = T)
 ```
 
 ------------------------------------------------------------------------
@@ -69,7 +69,7 @@ This data set consists of samples taken from 51 people ages 12-17 yrs from the P
 
 *All analyses performed using `r R.version$version.string`*
 
-### Clinical Data Pocessing
+### Clinical Data Processing
 
 Subjects are dichotomized to those that used a vaping device in the last 6 months and those who have not based on the variables *ever_vape*, *vape_days*, and *last_vape*. This variable will be referred to as *Vape Status* throughout this report. One participant (SID = 111) reported that they had used a vaping device 5 out of the last 30 days, but did not respond to *last_vape*. That participant is recorded as *Vaped* in this analysis. 
 Biological sex has been derived from methylation data utilizing the getSex function from the R package *minfi `r package.version("minfi")`*.  
@@ -84,26 +84,33 @@ Measures of lung function and IOS were visually inspected for normality using hi
 *Removal of Unwanted Variance: edgeR `r package.version("edgeR")` and RUVSeq `r package.version("RUVSeq")`*\
 *Differential Expression Analysis: DESeq2 `r package.version("DESeq2")`*\
 
+*Filtering*\
+To arrive at the final number of genes for this analysis, we first removed all genes with 0-counts in 75% or more of the samples. In addition, we removed genes which had a range of reads $\le$ 100 across all samples or 'housekeeping genes'.  
+
 *Normalization*\
 The following analyses used the function RUVr from the R package RUVSeq. RUVr uses the deviance residuals from a first pass negative binomial GLM to perform a factor analysis which corrects for unwanted technical effects. The first-pass model includes vape status, sex, and age.  
 
 $$raw \ read \ count \sim  vape \ status \ + sex + age$$  
 
-### Model Fitting  
-The differential expression analysis will use RUVr with k = 2 factors. Gene counts were fit using a negative binomial model from the R package DESeq2 `r package.version("DESeq2")`. To account for multiple testing the False Discovery Rate (FDR) was calculated and significance set at FDR < 0.05.  
+### Model Fitting
+The differential expression analysis will use RUVr with k = 2 factors. Gene counts were fit using negative binomial models from the R package DESeq2 `r package.version("DESeq2")`. To account for multiple testing the False Discovery Rate (FDR) was calculated and significance set at FDR < 0.05.
 
-$$Full \ Model :raw \ read \ count \sim vape \ status + recruitment \ center + sex + age + ruv_1 + ruv_2$$  
-$$Testing \ Vape \ and \ Center : raw \ read \ count \sim \  sex + age + ruv_1 + ruv_2 $$  
-$$Testing \ Vape \ Only : raw \ read \ count \sim recruitment \ center + sex + age + ruv_1 + ruv_2$$  
-$$Testing \ Center \ Only : raw \ read \ count \sim vape \ status + sex + age + ruv_1 + ruv_2$$  
+To parse out the effects that vape status and recruitment center have on gene expression, the following models were fit and compared using Likelihood Ratio Tests (LRTs) in DESeq2 `r package.version("DESeq2")`\:
+
+$$Full \ Model \\ raw \ read \ count \sim vape \ status + recruitment \ center + sex + age + ruv_1 + ruv_2$$  
+$$Reduced \ Model \ (Vape \ Status \ and \ Recruitment \ Center) \\ raw \ read \ count \sim \  sex + age + ruv_1 + ruv_2 $$  
+$$Reduced \ Model \ (Vape \ Status) \\ raw \ read \ count \sim recruitment \ center + sex + age + ruv_1 + ruv_2$$  
+$$Reduced \ Model \ (Recruitment \ Center) \\ raw \ read \ count \sim vape \ status + sex + age + ruv_1 + ruv_2$$ 
+
+All LRTs used the same full model, which included vape status (binary Y/N) and recruitment center (3-level categorical), sex (binary M/F), age (continuous), and two normalization factors from the RUVr Analysis. In each scenario above, DESeq2 tests if the covariates included in the full model but *not* the recuded model significantly explain gene expression. The reduced model for vape status and recrutment center tests if either vape status or recruitment center significantly explain gene expression after adjusting for sex, age, and the two RUV factors. The other models test similarly, but only for covariate at a time.  
 
 # Results  
 
-After removing participants with missing values for *vape status*, we are left with **n = 50** subjects. Previous analyses showed **n = 12** participants had vaped in the last 6 months. This analysis will use **n = 13** participants who had vaped in the last 6 months. The lung function variable *`r colnames(tab1_dat[,"fev1"])`* and *`r colnames(tab1_dat[,"fev1_fvc"])`* reported 22 missing values. IOS measures *`r colnames(tab1_dat[,"r5"])`* and *`r colnames(tab1_dat[,"x20"])`* reported 1 and 6 missing values, respectively.
+After removing participants with missing values for vape status, we are left with **n = 50** subjects. Previous analyses showed **n = 12** participants had vaped in the last 6 months. This analysis will use **n = 13** participants who had vaped in the last 6 months. The lung function variable 'fev1' and 'fev1_fvc' reported 22 missing values. IOS measures 'r5' and 'x20' reported 1 and 6 missing values, respectively.
 
-### Table 1: Clinical Data
+### Table 1: Subject Demographics
 
-```{r Table 1, message=FALSE, results='asis', echo=TRUE}
+```{r Table 1, results='asis'}
 
 #create table 1
 vape_6mo_table1 <- tab1_dat %>% 
@@ -122,7 +129,7 @@ arsenal::labels(vape_6mo_table1) <- c(vape_6mo_lab = "Vaped in last 6 months",
 summary(vape_6mo_table1, pfootnote = T)
 ```
 
-```{r figures, echo=TRUE, message=FALSE, warning=FALSE}
+```{r}
 #Figures
 #By sex (n = 50)
 sex_plot_trial <- tab1_dat %>% 
@@ -196,34 +203,32 @@ x20_box <- tab1_dat %>%
 
 ```
 
-### Figure 1: Population Demographics
+### Figure 1: Select Subject Demographics by Vape Status
 
-Figure 1 visualizes the demographic information presented in Table 1. The majority of vaping subjects were recruited in Pueblo (92%) and identified as LatinX (85%). 62% of subjects were male as confirmed from the available methylation data.
+The majority of vaping subjects were recruited in Pueblo (92%) and identified as LatinX (85%). 62% of subjects were male as confirmed from the available methylation data.
 
-```{r Demographic Figure, include=T, fig.height=6, fig.width=9}
+```{r Demographic Figure, fig.height=6, fig.width=9}
 #Demographic Figures
 ggarrange(recruitment_center_hist, ggarrange(bar_sex, bar_latino, ncol = 2, nrow = 1, legend = "none"), nrow = 2, common.legend = T, legend = "bottom")
 ```
 
-### Figure 2: Pulmonary Function
+### Figure 2: Pulmonary Function Values by Vape Status
 
-Figure 2 is a visualization of the pulmonary function ($\frac{FEV1}{FVC}$) and IOS (*R5* and *X20*) variables. $\frac{FEV1}{FVC}$ was only completed by **n = 22** individuals from the study population. *R5* and *X20* represent **n = 49** and **n = 44** individuals, respectively.
-
-```{r Respiratory Figure, echo=T, fig.height=6, fig.width=8, message=FALSE, warning=FALSE, include=TRUE}
+```{r Respiratory Figure, fig.height=6, fig.width=8}
 #Respiratory Figures
 ggarrange(hist_fev1_fvc, ggarrange(r5_box, x20_box, ncol = 2, nrow = 1, legend = "none"), nrow = 2, common.legend = T, legend = "bottom")
 ```
-
+$\frac{FEV1}{FVC}$ was completed by **n = 22** individuals from the study population. *R5* and *X20* represent **n = 49** and **n = 44** individuals, respectively.
   
-### Figure 3: Correlation Matrix  
-Figure 3 identifies correlation patterns in the clinical variables of interest.  
+### Figure 3: Correlation of Model Predictors  
+
 ```{r}
 source(here("Code/01_variable_correlation.R"), local = knitr::knit_global())
 
 correlation_matrix_plot
 ```
 
-From the correlation matrix, there is a significant correlation (p < 0.05) between vape status and recruitment center. The t-test for vape status and age (p = 0.522) shows no significant correlation.  
+There is a significant correlation between vape status and recruitment center (p < 0.05). The t-test for vape status and age (p = 0.522) shows no significant correlation.  
 
 *t-test: Vape Status and Age*
 ```{r}
@@ -233,13 +238,13 @@ age_report_tab
 
 ## Gene-Count Processing  
 
-After merging clinical metadata with gene-count data, there were **n = 47** samples present (see the Exploratory Report for further details). There were **n = 60,651** genes before filtering out poor-quality genes. This analysis will include a total of **n = 16,860** genes. 
+There were **n = 47** samples present with both demographic and RNA-Seq data (see the Exploratory Report for further details). There were n = 60,651 genes before filtering out poor-quality genes. This analysis will include a total of **n = 16,860** genes. 
 
 ### Figure 4: Relative Log Expression and Principal Component Analysis for RUV
 
-The following figures shows the Relative Log Expression (RLE) and Principal Component Analysis (PCA) of read counts for each sample both before and after transformation using RUVr with k = 2 factors. 
+The Relative Log Expression (RLE) and Principal Component Analysis (PCA) of read counts for each sample both before and after transformation using RUVr with k = 2 factors. There is initial concern for Sample 12 as an outlier.
   
-```{r RUVr Continues, message=FALSE, warning=FALSE, fig.height=7, fig.width= 10}
+```{r fig.height=7, fig.width= 10}
 source(here("Code/03c_gene_filter_and_ruv_CLEAN_for_DE.R"), local = knitr::knit_global())
 
 #Make nicer plot
@@ -258,7 +263,7 @@ legend(x = "bottomright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2
 
 ```
 
-```{r message=FALSE, warning=FALSE, fig.height=4, fig.width= 10}
+```{r fig.height=4, fig.width= 10}
 #Make nicer plot
 par(mfrow=c(1,2), cex = .75)
 
@@ -271,11 +276,13 @@ plotPCA(ruv_k2, col = colors[metadata_joined$vape_6mo_lab], main = "RUVr (k = 2)
 legend(x = "topright", legend = c("Vaped", "Did Not Vape"), fill = c(colors[2], colors[1]))
 ```  
 
-## Differential Expression Analysis
+Using two normalization factors, Sample 12 is no longer a suspected outlier and overall two factors sufficiently normalize the gene expression counts.
 
-*Table 3*
-```{r}
-#Read in the results
+## Differential Gene Expression Analysis
+
+### Figure 5: P-value Distrobutions (Unadjusted)
+```{r fig.height= 6, fig.width = 10}
+######################### Read in Results ###############################
 vape_center_res <- read_csv(here("DataProcessed/de_output/vape_center_res_2022_05_01.csv"))
 vape_res <- read_csv(here("DataProcessed/de_output/vape_res_2022_05_01.csv"))
 center_res <- read_csv(here("DataProcessed/de_output/center_res_2022_05_01.csv"))
@@ -294,28 +301,7 @@ ruv_counts <- left_join(ruv_counts, gene_annotations_ruv, by = c("gene" = "ENSG"
 #Fix vape status
 ruv_counts$vape_6mo_lab <- if_else(ruv_counts$vape_6mo_lab == "Did_Not_Vape_in_Last_6_Months", "Not Vaped", "Vaped")
 
-######################### Results Table ###############################
-# function 
-format_big <- function(x) {
-  formatC(x, digits = 0, format = "f", big.mark = ",")
-}
-
-sig_gene_count <- function(de_res) {
-  sum(de_res$padj < 0.05)
-}
-
-sig_genes_tab <- tibble(Model = c("Vape and Center", "Vape Only", "Center Only"),
-                        "Significant Genes (p < 0.05)" = c(format_big(sig_gene_count(vape_center_res)), 
-                                                           format_big(sig_gene_count(vape_res)),
-                                                           sig_gene_count(center_res))) %>% 
-  kbl(digits = 3, booktabs = TRUE) %>% 
-  kable_styling(position = "center", latex_options = "striped")
-sig_genes_tab
-```
-Table 3 gives the number of genes with adjusted p-values < 0.05 using an FDR correction of 0.05 for each of the models fit. Figure 5 shows the distribution of p-values without FDR correction. There appears to be a large peak near 0 for all models, but the *Center Only* model is considerably more conservative than the others. The peaks in the *Vape and Center* and *Vape Only* models are unusually high. 
-
-### Figure 5: P-value Histogram 
-```{r fig.height= 6, fig.width = 10}
+######################### P-Value Histograms ###############################
 p_hist <- function(de_results) {
   temp_hist <- de_results %>% 
     ggplot(aes(x = pvalue))+
@@ -340,11 +326,57 @@ center_only_phist <- p_hist(center_res) +
 ggarrange(vape_center_phist, vape_only_phist, center_only_phist, nrow = 1)
 ```
 
-To additionally check model results, Figures 6 - 8 box plots compare $\log_2$ transformed expression of the top 9 genes as indicated by the smallest FDR-adjusted p-values.  
+There appears to be a large peak near 0 for all models, but the *Center Only* model is considerably more conservative than the others. The peaks in the *Vape and Center* and *Vape Only* models are unusually high. Overall, there is no evidence for poor model fit. Table 3 shows shows both the total number of significant genes for each mode (FDR < 0.05) followed by the number of genes that were significant in only that model (FDR < 0.05). The *Center Only* model had 0 unique significant genes. 
 
-### Figures 6: $\log_2$(Normalized Expression) of Top Genes (Vape Status and Center)
+*Table 3: Summary of Significant LRT Results (Full Model the same across all tests)*
+```{r}
+######################### Results Table ###############################
+#join all results
+all_results <- left_join(vape_center_res, vape_res, by = "row", suffix = c(".vape_center", ".vape_only"))
+
+all_results <- left_join(all_results, center_res, by = "row", suffix = c("",".center_only"))
+
+all_pvals <- all_results %>% 
+  select(row, padj.vape_center, padj.vape_only, padj) %>% 
+  dplyr::rename(gene = row,
+                vape_center = padj.vape_center,
+                vape_only = padj.vape_only,
+                center_only = padj)
+
+all_pvals <- all_pvals %>% 
+  dplyr::mutate(vape_center_sig = if_else(vape_center < 0.05 & vape_only > 0.05 & center_only > 0.05, T,F),
+                vape_only_sig = if_else(vape_center > 0.05 & vape_only < 0.05 & center_only > 0.05, T,F),
+                center_only_sig = if_else(vape_center > 0.05 & vape_only > 0.05 & center_only < 0.05, T,F))
+# function 
+format_big <- function(x) {
+  formatC(x, digits = 0, format = "f", big.mark = ",")
+}
+
+sig_gene_count <- function(de_res) {
+  sum(de_res$padj < 0.05)
+}
+
+vape_center_sig <- as.numeric(sum(all_pvals$vape_center_sig))
+vape_only_sig <- as.numeric(sum(all_pvals$vape_only_sig))
+center_only_sig <- as.numeric(sum(all_pvals$center_only_sig))
+
+sig_genes_tab <- tibble(Model = c("Vape and Center", "Vape Only", "Center Only"),
+                        "Total Significant Genes (FDR < 0.05)" = c(format_big(sig_gene_count(vape_center_res)), 
+                                                           format_big(sig_gene_count(vape_res)),
+                                                           sig_gene_count(center_res)),
+                        "Unique Significant Genes (FDR < 0.05)" = c(format_big(vape_center_sig), 
+                                                           format_big(vape_only_sig),
+                                                           center_only_sig)) %>% 
+  kbl(digits = 3, booktabs = TRUE) %>% 
+  kable_styling(position = "center", latex_options = "striped")
+sig_genes_tab
+```
+
+To additionally check model results, Figures 6 - 8 box plots compare $\log_{2}$ transformed expression of the top 4 genes for each model as indicated by the smallest FDR.  
+
+### Figures 6: $\log_{2}$(Normalized Expression) of Top Genes (Vape Status and Center)
 ```{r fig.width=10, fig.height=8}
-######################### Top Gene Boxplots ###############################
+######################### Top Gene Boxplots Function ###############################
 
 #Set color pallettes to match
 center_colors <- brewer.pal(10,"Paired")[4:6]
@@ -395,9 +427,6 @@ tcount_boxplot <- function(tcounts) {
     
 }
 
-#code to label sample 12
-# geom_text(label = if_else(tcounts_vape_center$Row.names == "Sample12", tcounts_vape_center$Row.names, ""), col = "Red")
-
 ######################### Top Gene Boxplots ###############################
 #Vape and Center
 vape_center_plots <- tcount_boxplot(tcounts = vape_center_counts)
@@ -417,20 +446,20 @@ ggarrange(plotlist = list(vape_center_plots[[2]], vape_center_plots[[3]]), nrow 
 
 Stratifying by both Vape Status and Recruitment Center using the model results from *Vape and Center* (Figure 6) suggests that there is not a large difference between the groups specified. Additionally, Sample 12 has been highlighted again as a potential outlier that may be driving large variation in the group of vapers from Pueblo.
 
-### Figure 7: $\log_2$(Normalized Expression) of Top Genes (Vape Status Only)
+### Figure 7: $\log_{2}$(Normalized Expression) of Top Genes (Vape Status Only)
 ```{r, fig.width= 10, fig.height= 8}
 ggarrange(plotlist = list(vape_plots[[2]], vape_plots[[3]]), nrow = 1)
 ```
   The plots for the *Vape Status Only* model has similary trends to the *Vape and Center* model. The *Center Only* model (Figure 8), however, detects some difference by recruitment center. While Sample 12 continues to look like an outlier for three of the top four genes, one (bottom-right) does not have Sample 12 as one of the most or least-expressed samples. 
   
-### Figure 8: $\log_2$(Normalized Expression) of Top Genes (Center Only)
+### Figure 8: $\log_{2}$(Normalized Expression) of Top Genes (Center Only)
 ```{r fig.width= 10, fig.height= 8}  
 ggarrange(plotlist = list(center_plots[[2]], center_plots[[3]]), nrow = 1)
 ```
 
-The inclusion of the RUV factors in the selected models did not seem to correct the outlying nature of Sample 12 as the PCA and RLE plots (Figures 4 and 5) suggested. Figure 9 shows similar box plots to those displayed in figures 6 - 8 which use the normalized counts from RUVSeq to help assess Sample 12 as an outlier. Since RUVSeq does not test for gene significance, the same genes as the *Vape and Center* model (figure 6) are used. 
+The inclusion of the RUV factors in the selected models did not seem to correct the outlying nature of Sample 12 as the PCA and RLE plots (Figures 4 and 5) suggested. Figure 9 shows similar box plots to those displayed in figures 6 - 8 which use the normalized counts from RUVSeq to help assess Sample 12 as an outlier. Since RUVSeq does not test for gene significance, the same genes as the *Vape and Center* model (figure 6) are used for comparison. 
 
-### Figure 9: $\log_2$(RUV-Normalized) expression for comparison
+### Figure 9: $\log_{2}$(RUV-Normalized) expression for comparison
 ```{r fig.width= 10, fig.height= 8}
 ggarrange(plotlist = list(ruv_plots[[2]], ruv_plots[[3]]), nrow = 1)
 ```
