@@ -98,11 +98,11 @@ colnames(first_pass_residuls) <- metadata_joined$new_id
 ruv_k2 <- RUVr(ruv_prep, cIdx = genes, k = 2, residuals = first_pass_residuls)
 
 #write out needed results
-# ruv_k2_counts <- t((counts(ruv_k2[goi, ])+.5)) %>%
-#   merge(metadata_joined, ., by="row.names") %>%
-#   gather(gene, expression, (ncol(.)-length(goi) + 1):ncol(.))
+ruv_k2_norm_counts <- as.data.frame(normCounts(ruv_k2)) %>% 
+  mutate(gene = rownames(.)) %>% 
+  select(gene, everything())
 
-#write_csv(ruv_k2_counts, file = here("DataProcessed/RUV_k2_Counts_2022_05_01.csv"))
+# write_csv(ruv_k2_norm_counts, file = here("DataProcessed/RUV_k2_norm_counts_2022_05_06.csv"))
 
 ruv_k2_write <- pData(ruv_k2) %>% 
   mutate(new_id = rownames(.)) %>% 

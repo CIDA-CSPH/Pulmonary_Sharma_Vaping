@@ -12,14 +12,17 @@ filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/filtered_gene_
 genes <- scan(file = here("DataProcessed/filtered_gene_list_2022_04_20.txt"), character(), quote = "")
 metadata_joined <- as.data.frame(read_csv(here("DataProcessed/metadata_joined_2022_04_20.csv")))
 ruv_factor_dat <- read_csv(here("DataProcessed/ruv_factor_data_k2_2022_04_20.csv"))
-ruv_counts<- read_csv(here("DataProcessed/RUV_k2_Counts_2022_05_01.csv")) 
+ruv_counts<- read_csv(here("DataProcessed/RUV_k2_Counts_2022_05_01.csv"))
+ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/RUV_k2_norm_counts_2022_05_06.csv")))
 gene_annotations <- read_tsv(here("DataRaw/gencode_annotations.txt"))
 
-#fix rownames of filtered gene count
+#fix rownames of filtered gene count and ruv_counts
 rownames(filtered_gene_count) <- filtered_gene_count$Feature
 
 filtered_gene_count <- filtered_gene_count %>% 
   dplyr::select(-Feature)
+
+
 
 #join metadata with ruv factor data
 metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = "new_id", copy = T) %>% 
@@ -139,7 +142,7 @@ center_only_phist <- p_hist(center_res) +
 
 #fix metadata_joined vape status
 metadata_joined$vape_6mo_lab <- if_else(metadata_joined$vape_6mo_lab == "vaped", "Vaped", "Not Vaped")
-######################### Get top genes and tidy results for plotting ###############################
+######################### Get top genes and tidy results for plotting with DE Norm Counts ###############################
 gene_annotations <- gene_annotations %>% 
   mutate(gene = ENSG) %>% 
   select(gene, symbol)
@@ -148,16 +151,20 @@ de_res_tidy <- function(run_de, de_res, col_data) {
   #Get top 4 genes of interest
   genes_of_interest <- de_res$row[1:4]
   
+  #Normalize Counts
+  run_de <- estimateSizeFactors(run_de)
+  
   #Join and tidy
-  tcounts <- t((counts(run_de[genes_of_interest, ], 
-                       normalized=TRUE, replaced=FALSE)+.5)) %>%
+  norm_counts<- t(log10((counts(run_de[genes_of_interest, ], 
+                       normalized=TRUE)+.5))) %>%
     merge(col_data, ., by="row.names") %>%
     gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
   #add symbol name
   gene_symbols <- gene_annotations[gene_annotations$gene %in% genes_of_interest,]
   
-  tcounts <- left_join(tcounts, gene_symbols, by = "gene") 
-  return(tcounts)
+  norm_counts <- left_join(norm_counts, gene_symbols, by = "gene") 
+  
+  return(norm_counts)
 }
 #Vape and Center
 vape_center_tcounts <- de_res_tidy(de_res = vape_center_res, 
@@ -173,9 +180,48 @@ center_tcounts <- de_res_tidy(de_res = center_res,
                               col_data = metadata_joined)
 
 #write out files
-write_csv(vape_center_tcounts, file = here("DataProcessed/de_output/vape_center_counts_2022_05_01.csv"))
-write_csv(vape_tcounts, file = here("DataProcessed/de_output/vape_counts_2022_05_01.csv"))
-write_csv(center_tcounts, file = here("DataProcessed/de_output/center_counts_2022_05_01.csv"))
+# write_csv(vape_center_tcounts, file = here("DataProcessed/de_output/vape_center_de_normcounts_2022_05_01.csv"))
+# write_csv(vape_tcounts, file = here("DataProcessed/de_output/vape_de_normcounts_2022_05_01.csv"))
+# write_csv(center_tcounts, file = here("DataProcessed/de_output/center_de_normcounts_2022_05_01.csv"))
+
+######################### Get top genes and tidy results for plotting with RUV Norm Counts ###############################
+#fix ruv colnames
+rownames(ruv_norm_counts) <- ruv_norm_counts$gene
+
+ruv_norm_counts <- ruv_norm_counts %>% 
+  select(-gene)
+
+ruv_res_tidy <- function(ruv_count_dat, de_res, col_data) {
+  #Get top 4 genes of interest
+  genes_of_interest <- de_res$row[1:4]
+  
+  #Join and tidy
+  norm_counts<- t(log10((ruv_count_dat[genes_of_interest,] +.5))) %>%
+    merge(col_data, ., by="row.names") %>%
+    gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
+  #add symbol name
+  gene_symbols <- gene_annotations[gene_annotations$gene %in% genes_of_interest,]
+  
+  norm_counts <- left_join(norm_counts, gene_symbols, by = "gene") 
+  
+  return(norm_counts)
+}
+
+vape_center_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
+                                de_res = vape_center_res,
+                                col_data = metadata_joined)
+vape_only_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
+                                   de_res = vape_res,
+                                   col_data = metadata_joined)
+
+center_only_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
+                                     de_res = center_res,
+                                     col_data = metadata_joined)
+
+#write out results
+# write_csv(vape_center_ruv_tidy, file = here("DataProcessed/de_output/vape_center_ruv_normcounts_2022_05_06.csv"))
+# write_csv(vape_only_ruv_tidy, file = here("DataProcessed/de_output/vape_ruv_normcounts_2022_05_06.csv"))
+# write_csv(center_only_ruv_tidy, file = here("DataProcessed/de_output/center_ruv_normcounts_2022_05_06.csv"))
 
 ######################### Top Gene Boxplots ###############################
 #Fix labelling from metadata joined
@@ -187,7 +233,7 @@ vape_colors <- brewer.pal(3,"Set2")
 tcount_boxplot <- function(tcounts, mod) {
   #Stratified by Vape and Center
   vape_center_box <- tcounts %>% 
-    ggplot(aes(vape_6mo_lab, log2(expression), group = interaction(vape_6mo_lab, recruitment_center))) + 
+    ggplot(aes(vape_6mo_lab, expression, group = interaction(vape_6mo_lab, recruitment_center))) + 
     geom_boxplot(aes(fill = recruitment_center)) +
     geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
     facet_wrap(~gene, scales="free_y") + 
@@ -199,7 +245,7 @@ tcount_boxplot <- function(tcounts, mod) {
   
   #Stratified by vape status only
   vape_box <- tcounts %>% 
-    ggplot(aes(vape_6mo_lab, log2(expression), fill= vape_6mo_lab)) + 
+    ggplot(aes(vape_6mo_lab, expression, fill= vape_6mo_lab)) + 
     geom_boxplot() + 
     geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
     labs(x="Vape Status (6 mo)", 
@@ -214,7 +260,7 @@ tcount_boxplot <- function(tcounts, mod) {
   
   #Stratified by center only
   center_box <- tcounts %>% 
-    ggplot(aes(recruitment_center, log2(expression), fill=recruitment_center)) + 
+    ggplot(aes(recruitment_center, expression, fill=recruitment_center)) + 
     geom_boxplot() +
     geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), 
               col = "Red") +
@@ -235,7 +281,7 @@ tcount_boxplot <- function(tcounts, mod) {
 #code to label sample 12
 # geom_text(label = if_else(tcounts_vape_center$Row.names == "Sample12", tcounts_vape_center$Row.names, ""), col = "Red")
 
-######################### Top Gene Boxplots ###############################
+######################### Top Gene Boxplots DE Counts ###############################
 #Vape and Center
 vape_center_plots <- tcount_boxplot(tcounts = vape_center_tcounts, mod = "Vape and Center")
 
@@ -248,27 +294,52 @@ center_plots <- tcount_boxplot(tcounts = center_tcounts, mod = "Center Only")
 #ruv
 ruv_plots <- tcount_boxplot(tcounts = ruv_counts, mod = "RUV Only")
 
-# #Looking at plots
-# #Vape and Center
-# vape_center_plots[[1]]
-# vape_center_plots[[2]]
-# vape_center_plots[[3]]
-# 
-# #Vape only
-# vape_plots[[1]]
-# vape_plots[[2]]
-# vape_plots[[3]]
-# 
-# #Center Only
-# center_plots[[1]]
-# center_plots[[2]]
-# center_plots[[3]]
-# 
-# #RUV Only
-# ruv_plots[[1]]
-# ruv_plots[[2]]
-# ruv_plots[[3]]
+#Looking at plots
+#Vape and Center
+vape_center_plots[[1]]
+vape_center_plots[[2]]
+vape_center_plots[[3]]
 
+#Vape only
+vape_plots[[1]]
+vape_plots[[2]]
+vape_plots[[3]]
+
+#Center Only
+center_plots[[1]]
+center_plots[[2]]
+center_plots[[3]]
+
+#RUV Only
+ruv_plots[[1]]
+ruv_plots[[2]]
+ruv_plots[[3]]
+
+######################### Top Gene Boxplots RUV Counts ###############################
+#Vape and Center
+vape_center_plots_ruv <- tcount_boxplot(tcounts = vape_center_ruv_tidy, mod = "Vape and Center")
+
+#Vape only
+vape_plots_ruv <- tcount_boxplot(tcounts = vape_only_ruv_tidy, mod = "Vape Only")
+
+#Center Only
+center_plots_ruv <- tcount_boxplot(tcounts = center_only_ruv_tidy, mod = "Center Only")
+
+
+#Vape and Center
+vape_center_plots_ruv[[1]]
+vape_center_plots_ruv[[2]]
+vape_center_plots_ruv[[3]]
+
+#Vape only
+vape_plots_ruv[[1]]
+vape_plots_ruv[[2]]
+vape_plots_ruv[[3]]
+
+#Center Only
+center_plots_ruv[[1]]
+center_plots_ruv[[2]]
+center_plots_ruv[[3]]
 
 ggarrange(plotlist = list(vape_center_plots[[2]], vape_center_plots[[3]]), nrow = 1)
 
@@ -294,3 +365,7 @@ sig_genes_tab <- tibble(Model = c("Vape and Center", "Vape Only", "Center Only")
 
 
 
+sum(sizeFactors(vape_center_de) == sizeFactors(vape_de))
+
+counts(vape_center_de, normalized = T)[1,1]
+counts(vape_de, normalized = T)[1,1]
