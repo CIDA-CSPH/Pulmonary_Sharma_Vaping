@@ -300,7 +300,7 @@ gene_annotations_ruv <- gene_annotations[gene_annotations$ENSG %in% ruv_counts$g
 ruv_counts <- left_join(ruv_counts, gene_annotations_ruv, by = c("gene" = "ENSG"))
 #Fix vape status
 ruv_counts$vape_6mo_lab <- if_else(ruv_counts$vape_6mo_lab == "Did_Not_Vape_in_Last_6_Months", "Not Vaped", "Vaped")
-
+ruv_counts$expression <- log10(ruv_counts$expression)
 ######################### P-Value Histograms ###############################
 p_hist <- function(de_results) {
   temp_hist <- de_results %>% 
@@ -387,7 +387,7 @@ tcount_boxplot <- function(tcounts) {
   vape_center_box <- tcounts %>% 
     ggplot(aes(vape_6mo_lab, expression, group = interaction(vape_6mo_lab, recruitment_center))) + 
     geom_boxplot(aes(fill = recruitment_center)) +
-    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
+    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Black") +
     facet_wrap(~symbol, scales="free_y") + 
     labs(x="", 
          y="Expression (log-normalized counts)", 
@@ -398,7 +398,7 @@ tcount_boxplot <- function(tcounts) {
   vape_box <- tcounts %>% 
     ggplot(aes(vape_6mo_lab, expression, fill= vape_6mo_lab)) + 
     geom_boxplot() + 
-    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
+    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Black") +
     labs(x="Vape Status (6 mo)", 
          y="Expression (log-normalized counts)", 
          fill = "Vape Status (6 mo)") +
@@ -413,7 +413,7 @@ tcount_boxplot <- function(tcounts) {
     ggplot(aes(recruitment_center, expression, fill=recruitment_center)) + 
     geom_boxplot() +
     geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), 
-              col = "Red") +
+              col = "Black") +
     facet_wrap(~symbol) + 
     labs(x="Recruitment Center", 
          y="Expression (log-normalized counts)", 
