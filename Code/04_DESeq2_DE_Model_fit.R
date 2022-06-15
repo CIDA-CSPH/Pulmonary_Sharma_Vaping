@@ -8,12 +8,11 @@ library(RColorBrewer)
 library(kableExtra)
 
 ######################### Read in files so that they are unaltered and join ###############################
-filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/filtered_gene_count_2022_05_04.csv")))
-genes <- scan(file = here("DataProcessed/filtered_gene_list_2022_04_20.txt"), character(), quote = "")
-metadata_joined <- as.data.frame(read_csv(here("DataProcessed/metadata_joined_2022_04_20.csv")))
-ruv_factor_dat <- read_csv(here("DataProcessed/ruv_factor_data_k2_2022_04_20.csv"))
-ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/RUV_k2_norm_counts_2022_05_06.csv")))
-gene_annotations <- read_tsv(here("DataRaw/gencode_annotations.txt"))
+filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/genetic/filtered_gene_count_2022_05_04.csv")))
+metadata_joined <- as.data.frame(read_csv(here("DataProcessed/metadata/metadata_joined_2022_04_20.csv")))
+ruv_factor_dat <- read_csv(here("DataProcessed/ruv/ruv_factor_data_k2_2022_04_20.csv"))
+ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
+gene_annotations <- read_tsv(here("DataRaw/gene_annotation/gencode_annotations.txt"))
 
 #fix rownames of filtered gene count and ruv_counts
 rownames(filtered_gene_count) <- filtered_gene_count$Feature
@@ -29,8 +28,7 @@ metadata_joined <- metadata_joined %>%
 
 #fix gene annotations
 gene_annotations <- gene_annotations %>% 
-  dplyr::mutate(gene = ENSG) %>% 
-  dplyr::select(gene, symbol)
+  dplyr::rename(row = ENSG)
 
 #fix ruv colnames
 rownames(ruv_norm_counts) <- ruv_norm_counts$gene
@@ -80,18 +78,22 @@ run_deseq_lrt <- function(count_data, col_data, full_mod, reduced_mod) {
                                          colData = col_data,
                                          design = full_mod)
   #Run DESeq
-  deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod)
+  deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod, )
   
   #Return the results
   return(deseq_run)
 }
 
 #DESeq Results table
-format_results <- function(deseq_run) {
+format_results <- function(deseq_run, annotation) {
   #Pull out resultsand sort by padj and pval
   deseq_res <- DESeq2::results(deseq_run, tidy = T, alpha = 0.05) %>% 
     arrange(padj, pvalue) %>% 
-    tbl_df()
+    tbl_df() %>% 
+    left_join(.,annotation, by = 'row') %>% 
+    select(row, symbol, gene_type, everything()) %>% 
+    dplyr::rename(ensg = row,
+                  gene_name = symbol)
   return(deseq_res)
 }
 
@@ -106,7 +108,7 @@ p_hist <- function(de_results) {
 #tidy results for plotting (DESEQ-Normalized)
 de_res_tidy <- function(run_de, de_res, col_data) {
   #Get top 4 genes of interest
-  genes_of_interest <- de_res$row[1:4]
+  genes_of_interest <- de_res$row
   
   #Normalize Counts
   run_de <- estimateSizeFactors(run_de)
@@ -125,18 +127,17 @@ de_res_tidy <- function(run_de, de_res, col_data) {
 }
 
 #tidy results for plotting (RUV-Normalized)
-ruv_res_tidy <- function(ruv_count_dat, de_res, col_data) {
+ruv_res_tidy <- function(ruv_count_dat, de_res, col_data, annotation) {
   #Get top 4 genes of interest
-  genes_of_interest <- de_res$row[1:4]
+  genes_of_interest <- de_res$ensg[1:100]
   
   #Join and tidy
   norm_counts<- t(log10((ruv_count_dat[genes_of_interest,] +.5))) %>%
     merge(col_data, ., by="row.names") %>%
     gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
-  #add symbol name
-  gene_symbols <- gene_annotations[gene_annotations$gene %in% genes_of_interest,]
   
-  norm_counts <- left_join(norm_counts, gene_symbols, by = "gene") 
+  #join back with gene name
+  norm_counts <- left_join(norm_counts, annotation, by = c("gene" = "row"))
   
   return(norm_counts)
 }
@@ -214,15 +215,15 @@ center_de <- run_deseq_lrt(count_data = filtered_gene_count,
                            reduced_mod = vape_only_reduced)
 
 ######################### Get Formatted Results ###############################
-vape_center_res <- format_results(vape_center_de)
+vape_center_res <- format_results(vape_center_de, gene_annotations)
 
-vape_res <- format_results(vape_de)
+vape_res <- format_results(vape_de, gene_annotations)
 
-center_res <- format_results(center_de)
+center_res <- format_results(center_de, gene_annotations)
 
 #Write out results
 # write_csv(vape_center_res, file = here("DataProcessed/de_output/vape_center_res_2022_05_01.csv"))
-# write_csv(vape_res, file = here("DataProcessed/de_output/vape_res_2022_05_01.csv"))
+# write_csv(vape_res, file = here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
 # write_csv(center_res, file = here("DataProcessed/de_output/center_res_2022_05_01.csv"))
 
 ######################### P-Value Histograms ###############################
@@ -263,8 +264,10 @@ vape_center_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
                                      de_res = vape_center_res,
                                      col_data = metadata_joined)
 vape_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
-                              de_res = vape_res,
-                              col_data = metadata_joined)
+                                   de_res = vape_res,
+                                   col_data = metadata_joined,
+                                   annotation = gene_annotations)
+
 
 center_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
                                 de_res = center_res,
@@ -272,7 +275,7 @@ center_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
 
 #write out results
 # write_csv(vape_center_ruv_tidy, file = here("DataProcessed/de_output/vape_center_ruv_normcounts_2022_05_06.csv"))
-# write_csv(vape_only_ruv_tidy, file = here("DataProcessed/de_output/vape_ruv_normcounts_2022_05_06.csv"))
+# write_csv(vape_ruv_tidy, file = here("DataProcessed/de_full/top100_vape_ruv_normcounts_2022_06_14.csv"))
 # write_csv(center_only_ruv_tidy, file = here("DataProcessed/de_output/center_ruv_normcounts_2022_05_06.csv"))
 
 ######################### Top Gene Boxplots DE Counts ###############################

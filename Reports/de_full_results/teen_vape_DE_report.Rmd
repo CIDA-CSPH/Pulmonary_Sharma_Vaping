@@ -49,7 +49,7 @@ library(minfi)
 
 ```{r import data, include=FALSE}
 #import data
-source(here("Code/00_clean_metadata.R"), local = knitr::knit_global())
+tab1_dat <- read_csv(here("DataProcessed/metadata/table1_clean_data_2022_03_30.csv"))
 
 #filter out 1 NA for vape status
 tab1_dat <- tab1_dat %>% 
@@ -283,16 +283,16 @@ Using two normalization factors, Sample 12 is no longer a suspected outlier and 
 ### Figure 5: P-value Distrobutions (Unadjusted)
 ```{r fig.height= 6, fig.width = 10}
 ######################### Read in Results ###############################
-vape_center_res <- read_csv(here("DataProcessed/de_output/vape_center_res_2022_05_01.csv"))
-vape_res <- read_csv(here("DataProcessed/de_output/vape_res_2022_05_01.csv"))
-center_res <- read_csv(here("DataProcessed/de_output/center_res_2022_05_01.csv"))
+vape_center_res <- read_csv(here("DataProcessed/de_full/vape_center_res_2022_05_01.csv"))
+vape_res <- read_csv(here("DataProcessed/de_full/vape_res_2022_05_01.csv"))
+center_res <- read_csv(here("DataProcessed/de_full/center_res_2022_05_01.csv"))
 
 #Read in log-normalized counts (See 04_DESeq2_DE_Model_fit.R)
-vape_center_counts <- read_csv(here("DataProcessed/de_output/vape_center_ruv_normcounts_2022_05_06.csv"))
-vape_counts <- read_csv(here("DataProcessed/de_output/vape_ruv_normcounts_2022_05_06.csv"))
-center_counts <- read_csv(here("DataProcessed/de_output/center_ruv_normcounts_2022_05_06.csv"))
-ruv_counts <- read_csv(here("DataProcessed/RUV_k2_Counts_2022_05_01.csv"))
-gene_annotations <- read_tsv(here("DataRaw/gencode_annotations.txt"))
+vape_center_counts <- read_csv(here("DataProcessed/de_full/vape_center_ruv_normcounts_2022_05_06.csv"))
+vape_counts <- read_csv(here("DataProcessed/de_full/vape_ruv_normcounts_2022_05_06.csv"))
+center_counts <- read_csv(here("DataProcessed/de_full/center_ruv_normcounts_2022_05_06.csv"))
+ruv_counts <- read_csv(here("DataProcessed/ruv/RUV_k2_norm_counts_2022_05_06.csv"))
+gene_annotations <- read_tsv(here("DataRaw/gene_annotation/gencode_annotations.txt"))
 
 gene_annotations_ruv <- gene_annotations[gene_annotations$ENSG %in% ruv_counts$gene,]
 

@@ -15,7 +15,6 @@ ruv_factor_dat <- read_csv(here("DataProcessed/ruv/ruv_factor_data_k2_2022_04_20
 ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
 gene_annotations <- read_tsv(here("DataRaw/gene_annotation/gencode_annotations.txt"))
 de_full_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
-
 #fix rownames of filtered gene count and ruv_counts
 rownames(filtered_gene_count) <- filtered_gene_count$Feature
 filtered_gene_count <- filtered_gene_count %>% 
@@ -58,21 +57,21 @@ metadata_joined <- metadata_joined %>%
 #check that row and column names are equal
 all(rownames(metadata_joined) == colnames(filtered_gene_count))
 
-######################### Filter out Sample 12 ###############################
+######################### Filter for Pueblo ###############################
 #metadata
-metadata_joined_no12 <- metadata_joined %>%
-  filter(sid != 102)
-#count data
-filtered_gene_count_no12 <- filtered_gene_count %>%
-  select(-Sample12)
+metadata_joined_pblo <- metadata_joined %>%
+  filter(recruitment_center == 'Pueblo')
+
+ #count data
+filtered_gene_count_pblo <- filtered_gene_count[,rownames(metadata_joined_pblo)]
+
 #ruv normcounts
-ruv_norm_counts_no12 <- ruv_norm_counts %>% 
-  select(-Sample12)
+ruv_norm_counts_pblo <- ruv_norm_counts [,rownames(metadata_joined_pblo)]
 
 ######################### Design Matrices ###############################
-full_design <- ~vape_6mo_lab + sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 
+full_design <- ~vape_6mo_lab + sex_lab + age + ruv_k1 + ruv_k2 
 
-vape_only_reduced <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2
+vape_only_reduced <- ~ sex_lab + age + ruv_k1 + ruv_k2
 
 ######################### Required Functions ###############################
 # format numbers
@@ -116,61 +115,63 @@ p_hist <- function(de_results) {
 }
 
 #tidy results for plotting (DESEQ-Normalized)
-de_res_tidy <- function(run_de, de_res, col_data, annotation) {
+de_res_tidy <- function(run_de, de_res, col_data) {
   #Get top 4 genes of interest
-  genes_of_interest <- de_res$ensg[1:4]
+  genes_of_interest <- de_res$row[1:4]
   
   #Normalize Counts
   run_de <- estimateSizeFactors(run_de)
   
   #Join and tidy
   norm_counts<- t(log10((counts(run_de[genes_of_interest, ], 
-                                normalized=TRUE) + .5))) %>%
-    merge(col_data, ., by = "row.names") %>%
+                                normalized=TRUE)+.5))) %>%
+    merge(col_data, ., by="row.names") %>%
     gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
+  #add symbol name
+  gene_symbols <- gene_annotations[gene_annotations$gene %in% genes_of_interest,]
   
-  #join back with gene name
-  norm_counts <- left_join(norm_counts, annotation, by = c("gene" = "row"))
+  norm_counts <- left_join(norm_counts, gene_symbols, by = "gene") 
   
   return(norm_counts)
 }
 
 #tidy results for plotting (RUV-Normalized)
-ruv_res_tidy <- function(ruv_count_dat, de_res, col_data, annotation) {
+ruv_res_tidy <- function(ruv_count_dat, de_res, col_data) {
   #Get top 4 genes of interest
-  genes_of_interest <- de_res$ensg[1:100]
+  genes_of_interest <- de_res$row[1:4]
   
   #Join and tidy
   norm_counts<- t(log10((ruv_count_dat[genes_of_interest,] +.5))) %>%
     merge(col_data, ., by="row.names") %>%
     gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
+  #add symbol name
+  gene_symbols <- gene_annotations[gene_annotations$gene %in% genes_of_interest,]
   
-  #join back with gene name
-  norm_counts <- left_join(norm_counts, annotation, by = c("gene" = "row"))
+  norm_counts <- left_join(norm_counts, gene_symbols, by = "gene") 
   
   return(norm_counts)
 }
 
 #Results Boxplots (Vape and Center, Vape Only, Center Only)
 tcount_boxplot <- function(tcounts, mod) {
-  #Stratified by Vape and Center
-  vape_center_box <- tcounts %>% 
-    ggplot(aes(vape_6mo_lab, expression, group = interaction(vape_6mo_lab, recruitment_center))) + 
-    geom_boxplot(aes(fill = recruitment_center)) +
-    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
-    facet_wrap(~symbol, scales="free_y") + 
-    labs(x="", 
-         y="Expression (log normalized counts)", 
-         fill="Center", 
-         title= paste0("Top Genes (", mod, ")")) +
-    scale_fill_manual(values = center_colors) + 
-    theme(legend.position = "bottom")
+  # #Stratified by Vape and Center
+  # vape_center_box <- tcounts %>% 
+  #   ggplot(aes(vape_6mo_lab, expression, group = interaction(vape_6mo_lab, recruitment_center))) + 
+  #   geom_boxplot(aes(fill = recruitment_center)) +
+  #   geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
+  #   facet_wrap(~symbol, scales="free_y") + 
+  #   labs(x="", 
+  #        y="Expression (log normalized counts)", 
+  #        fill="Center", 
+  #        title= paste0("Top Genes (", mod, ")")) +
+  #   scale_fill_manual(values = center_colors) + 
+  #   theme(legend.position = "bottom")
   
   #Stratified by vape status only
   vape_box <- tcounts %>% 
     ggplot(aes(vape_6mo_lab, expression, fill= vape_6mo_lab)) + 
     geom_boxplot() + 
-    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
+    # geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
     labs(x="Vape Status (6 mo)", 
          y="Expression (log normalized counts)", 
          fill = "Vape Status (6 mo)", 
@@ -181,23 +182,23 @@ tcount_boxplot <- function(tcounts, mod) {
           axis.ticks.x = element_blank(),
           legend.position = "bottom")
   
-  #Stratified by center only
-  center_box <- tcounts %>% 
-    ggplot(aes(recruitment_center, expression, fill=recruitment_center)) + 
-    geom_boxplot() +
-    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), 
-              col = "Red") +
-    facet_wrap(~symbol, scales="free_y") + 
-    labs(x="Recruitment Center", 
-         y="Expression (log normalized counts)", 
-         fill="Center", 
-         title= paste0("Top Genes (", mod, ")")) +
-    scale_fill_manual(values = center_colors) + 
-    theme(axis.text.x = element_blank(),
-          axis.ticks.x = element_blank(),
-          legend.position = "bottom") 
+  # #Stratified by center only
+  # center_box <- tcounts %>% 
+  #   ggplot(aes(recruitment_center, expression, fill=recruitment_center)) + 
+  #   geom_boxplot() +
+  #   geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), 
+  #             col = "Red") +
+  #   facet_wrap(~symbol, scales="free_y") + 
+  #   labs(x="Recruitment Center", 
+  #        y="Expression (log normalized counts)", 
+  #        fill="Center", 
+  #        title= paste0("Top Genes (", mod, ")")) +
+  #   scale_fill_manual(values = center_colors) + 
+  #   theme(axis.text.x = element_blank(),
+  #         axis.ticks.x = element_blank(),
+  #         legend.position = "bottom") 
   
-  return(list(vape_center_box, vape_box, center_box))
+  return(vape_box)
   
 }
 
@@ -208,58 +209,93 @@ sig_gene_count <- function(de_res) {
 
 ######################### Run DESeq ###############################
 #Vape Only
-vape_de_no12 <- run_deseq_lrt(count_data = filtered_gene_count_no12, 
-                         col_data = metadata_joined_no12,
-                         full_mod = full_design,
-                         reduced_mod = vape_only_reduced)
+vape_de_pblo <- run_deseq_lrt(count_data = filtered_gene_count_pblo, 
+                              col_data = metadata_joined_pblo,
+                              full_mod = full_design,
+                              reduced_mod = vape_only_reduced)
 
 ######################### Get Formatted Results ###############################
-#vape only
-vape_res_no12 <- format_results(vape_de_no12, gene_annotations)
 
-#with cutoff
-vape_res_no12_cutoff <- vape_res_no12 %>% 
-  filter()
-######################### P-Value Histograms ###############################
-#Vape Only
-vape_only_phist_no12 <- p_hist(vape_res_no12) +
-  labs(title = "Vape Only")
-
-######################### Top Genes Tidy DE-Norm Counts ###############################
-#fix metadata_joined vape status
-metadata_joined_no12$vape_6mo_lab <- if_else(metadata_joined_no12$vape_6mo_lab == "vaped", "Vaped", "Not Vaped")
-
-#Vape only
-vape_de_tidy_no12  <- de_res_tidy(de_res = vape_res_no12, 
-                            run_de = vape_de_no12,
-                            col_data = metadata_joined_no12,
-                            annotation = gene_annotations)
-
-######################### Top Genes Tidy RUV-Norm Counts ###############################
-#Vape only
-vape_ruv_tidy_no12 <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts_no12,
-                                   de_res = vape_res_no12,
-                                   col_data = metadata_joined_no12,
-                                   annotation = gene_annotations)
-
-write_csv(vape_ruv_tidy_no12, here("DataProcessed/de_sample12_sensitivity/RUV_Vape_Results_no12_2022_06_14.csv"))
-
-######################### Top Gene Boxplots DE Counts ###############################
-#Set color pallettes to match
-center_colors <- brewer.pal(10,"Paired")[4:6]
-vape_colors <- brewer.pal(3,"Set2")
-
-#Vape only
-vape_plots_no12 <- tcount_boxplot(tcounts = vape_de_tidy_no12, mod = "Vape Only")
-
-
-
-######################### Top Gene Boxplots RUV Counts ###############################
-
-#Vape only
-vape_plots_ruv_no12 <- tcount_boxplot(tcounts = vape_ruv_tidy_no12, mod = "Vape Only")
-
-
+vape_res_pblo <- format_results(vape_de_pblo, gene_annotations)
 
 #Write out results
-# write_csv(vape_res_no12, here("DataProcessed/de_sample12_sensitivity/Vape_Results_no12_2022_05_11.csv"))
+#write_csv(vape_res_pblo, "DataProcessed/de_pueblo_sensitivity/vape_res_pblo_2022_06_13.csv")
+
+######################### Filter for log-fold change (check) ###############################
+
+check_lf_cutoff <- function(de_res) {
+  cutoff_seq <- seq(0,6,0.5)
+  cutoff_res <- NULL
+  for (cutoff in cutoff_seq) {
+    num_genes <- nrow(de_res %>%
+                        filter(padj < 0.05) %>% 
+                        filter(abs(log2FoldChange) > cutoff))
+    cutoff_res <- append(cutoff_res, num_genes)
+  }
+  
+  result <- tibble(Cutoff = cutoff_seq,
+                   Genes = cutoff_res)
+  return(result)
+}
+
+pblo_res_cutoff <- check_lf_cutoff(vape_res_pblo)
+
+full_res_cutoff <- check_lf_cutoff(de_full_res)
+
+full_res_cutoff %>% 
+  ggplot(aes(x = Cutoff, y = Genes)) +
+  geom_point() +
+  geom_line() + geom_hline(yintercept = 1000, col = 'red')
+
+######################### Implement log2 Fold Change cutoff ###############################
+
+#pueblo sensitivity
+vape_res_pblo <- vape_res_pblo %>% 
+  filter(abs(log2FoldChange) > 1)
+
+#full analysis
+de_full_res <- de_full_res %>% 
+  filter(abs(log2FoldChange) > 1)
+
+######################### P-Value Histograms ###############################
+#Vape Only
+vape_only_phist_pblo <- p_hist(vape_res_pblo) +
+  labs(title = "Vape Only")
+
+vape_only_phist_pblo
+######################### Top Genes Tidy DE-Norm Counts ###############################
+#fix metadata_joined vape status
+metadata_joined_pblo$vape_6mo_lab <- if_else(metadata_joined_pblo$vape_6mo_lab == "vaped", "Vaped", "Not Vaped")
+
+#Vape only
+vape_de_tidy_pblo  <- de_res_tidy(de_res = vape_res_pblo, 
+                                  run_de = vape_de_pblo,
+                                  col_data = metadata_joined_pblo)
+
+######################### Top Genes Tidy RUV-Norm Counts ###############################
+
+vape_ruv_tidy_pblo <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts_pblo,
+                                   de_res = vape_res_pblo,
+                                   col_data = metadata_joined_pblo)
+
+
+
+# ######################### Top Gene Boxplots DE Counts ###############################
+# #Set color pallettes to match
+# vape_colors <- brewer.pal(3,"Set2")
+# 
+# #Vape only
+# vape_plots_pblo <- tcount_boxplot(tcounts = vape_de_tidy_pblo, mod = "Vape Only")
+# 
+# 
+# vape_plots_pblo
+# 
+# 
+# ######################### Top Gene Boxplots RUV Counts ###############################
+# 
+# #Vape only
+# vape_plots_ruv_pblo <- tcount_boxplot(tcounts = vape_ruv_tidy_pblo, mod = "Vape Only")
+# 
+# 
+# vape_plots_ruv_pblo
+
