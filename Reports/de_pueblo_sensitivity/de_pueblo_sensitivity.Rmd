@@ -27,7 +27,7 @@ knitr::include_graphics(logo)
 ------------------------------------------------------------------------
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, message = F, warning = F, error = F)
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F, error = F, fig.align = 'center')
 library(ggpubr)
 library(tidyverse)
 library(knitr)
@@ -50,7 +50,7 @@ format_num <- function(number, digits = 0) {
 
 # Introduction
 
-The overall breakdown of study participants shows that 12 of the 13 (92%) of vapers recruited for this study were from the Pueblo center; however, the pueblo center accounts for only 42% of the study population. The purpose of this report is to look at an analysis of only the participants recruited from the Pueblo center and compare it to the overall model to ensure that RUVr normalization is appropriately adjusting for this correlation. 
+The breakdown of study participants shows that 12 of the 13 (92%) of vapers recruited for this study were from the Pueblo recruitment center. Overall, 21 subjects (42%) were recruited at the Pueblo center. The purpose of this report is to look at an analysis of only the participants recruited from the Pueblo center and compare it to the overall model containing all study participants to assess differences in estimates and significant gene composition between the models. 
 
 # Methods
 
@@ -60,7 +60,7 @@ $$Full \ Model \\ raw \ read \ count \sim vape \ status + recruitment \ center +
 
 $$Reduced \ Model \ (Vape \ Status) \\ raw \ read \ count \sim recruitment \ center + sex + age + ruv_1 + ruv_2$$
 
-When fitting the model for only the subjects recruited in pueblo, the *recruitment center* covariate is held constant, and therefore, not included in the model. Each of these models will test if *vape status* contributes significantly to gene expression.  
+When fitting the model for only the subjects recruited in Pueblo, the *recruitment center* covariate is held constant, and therefore, not included in the model. Each of these models will test if *vape status* contributes significantly to gene expression.  
 
 To assess the difference in the models, the results will focus on genes with relatively low variability. To achieve a stable subset, a cutoff value of |Log~2~(Fold-Change)| > 2 will be used (see "sample12_sensitivity_report" for details). This report will present:\
 <br/>
@@ -73,8 +73,7 @@ To assess the difference in the models, the results will focus on genes with rel
 
 # Results
 
-The top 100 genes determined by the FDR-adjusted p-value were subset from Model A to compare to Model B. This comparison shows that the top 100 genes in Model A are identical to the top 100 genes in Model B. Some of these genes have very small estimates, which may lead to an extremely large % change, even if the actual amount of change is relatively small. To find a more stable subset of genes, Figure 1 presents a range of possible cutoff values and how many genes in the top 100 are replaced compared to a model with no cutoff.
-
+The top 100 genes determined by the FDR-adjusted p-value were subset from Model A to compare to Model P. This comparison shows that the top 100 genes in Model A are identical to the top 100 genes in Model P. 
 ```{r fig.width=12}
 #############Read in results###################
 modA_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
@@ -82,18 +81,15 @@ modB_res <- read_csv(here("DataProcessed/de_pueblo_sensitivity/vape_res_pblo_202
 
 #############Join results and get top 100 genes###################
 AB_res <- left_join(modA_res, modB_res, by = c("ensg", "gene_name", "gene_type"), suffix = c(".modA", ".modB"))
-#no cutoff
-top_100_genes_AB <- AB_res %>% arrange(padj.modA) %>% .[1:100,]
+
 
 ######################### Filter for log-fold change (check) ###############################
-AB_res <- AB_res %>% 
-  filter(abs(log2FoldChange.modA) > 2) %>% 
-  arrange(padj.modA)
+
 
 #Make Tidy Results
-cutoff_100_res <- cutoff_100 %>% 
+AB_res <- AB_res %>% 
   dplyr::mutate(fold_change_diff = log2FoldChange.modB - log2FoldChange.modA,
-                fold_change_diff_p = (log2FoldChange.modB - log2FoldChange.modA)/log2FoldChange.modA) %>% 
+                fold_change_diff_p = ((log2FoldChange.modB - log2FoldChange.modA)/log2FoldChange.modA)*100) %>% 
   dplyr::select(ensg, gene_name, gene_type, log2FoldChange.modA, log2FoldChange.modB, fold_change_diff, fold_change_diff_p, padj.modA, padj.modB) %>% 
   dplyr::rename(Gene = ensg,
                 Gene_Name = gene_name,
@@ -101,27 +97,26 @@ cutoff_100_res <- cutoff_100 %>%
                 Estimate_A = log2FoldChange.modA,
                 Estimate_B = log2FoldChange.modB,
                 Estimate_Difference = fold_change_diff,
+                Estimate_P_Difference = fold_change_diff_p,
                 FDR_A = padj.modA,
                 FDR_B = padj.modB)
+
+AB_res_no_cutoff <- AB_res
+
 ```
+### Figure 1: Total Significant Genes in Models A & B
 
-Figure 1 shows A) the number of genes removed from all significant genes in Model A and B) the number of genes that change in the subset of the top 100 genes. It should be noted that those genes are still significant, but not included in the range of the cutoff demonstrated. In the interest of obtaining a smaller subset of genes to work with, we will use a cutoff of an |Log~2~(Fold-Change)| of 2. At this cutoff value,  `r format_num(as.numeric(sample_12_cutoff[9,2]), 0)` genes remain in the overall results from Model A, and `r format_num(as.numeric(sample_12_cutoff[9,3]), 0)` genes changed in the composition of the top 100 genes.
+The top 100 significant genes in models A & P are identical both before and after the selected cutoff value (|Log~2~(Fold-Change)| > 2). A Venn Diagram of these would be trivial (a single circle), so Figure 2 shows the breakdown of the significant genes in Models A and P.  
 
-```{r}
-
-
-
-
-# #############Venn Diagram##################
+```{r echo=FALSE}
+# # #############Venn Diagram##################
 # #Get significant pvals
-# pval_match <- AB_res_cutoff %>% 
+# pval_match <- AB_res %>%
 #   dplyr::mutate(modA_sig = if_else(FDR_A < 0.05 & FDR_B > 0.05, T,F),
 #                 modB_sig = if_else(FDR_B < 0.05 & FDR_A > 0.05, T,F),
 #                 modAB_sig = if_else(FDR_B < 0.05 & FDR_A < 0.05, T,F),
-#                 neither_sig = if_else(FDR_A > 0.05 & FDR_B > 0.05,T, F)) %>% 
+#                 neither_sig = if_else(FDR_A > 0.05 & FDR_B > 0.05,T, F)) %>%
 #   dplyr::arrange(FDR_A)
-# 
-# cutoff_100 <- pval_match[1:100,]
 # 
 # #Get significant gene names for each model
 # modA_sig_genes <- pval_match[pval_match$FDR_A < 0.05,]$Gene
@@ -130,38 +125,43 @@ Figure 1 shows A) the number of genes removed from all significant genes in Mode
 # #Set color palatte
 # venn_color <- brewer.pal(3,"Pastel2")
 # 
-# Make Venn Diagram
+# #Make Venn Diagram
 # VennDiagram::venn.diagram(x = list(modA_sig_genes,modB_sig_genes),
-#                           category.names = c("Model A","Model B"),
-#                           filename = here("Reports/figures/venn_diagrams/sample12_sens_venn.png"),
+#                           category.names = c("Model A","Model P"),
+#                           filename = here("figures/venn_diagrams/pueblo_sens_venn.png"),
 #                           lwd = 2,
 #                           fill = c(venn_color[1],venn_color[3]))
 ```
 
-### Figure 2: Total Significant Genes in Models A & B
 
-The top 100 significant genes in models A & B are identical both before and after the selected cutoff value (|Log~2~(Fold-Change)| > 2). A Venn Diagram of these would be trivial (a single circle), so Figure 2 shows the breakdown of the significant genes in Models A and B.  
 
-![](/Users/hawkjona/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/CIDA/Sharma_Vape_Local/figures/sample12_sens_venn.jpg)
-One feature that is not yet understood is that there are a large number of significant genes in both models (>6000). Figure 3 displays A) Log~2~(Fold-Change) from each model plotted against each other; B & C) histograms of the difference in Log~2~(Fold-Change) estimates by subtracting the estimate of Model B from the estimate from Model A. 
+![](/Users/hawkjona/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/CIDA/Sharma_Vape_Local/figures/venn_diagrams/pueblo_sens_venn.jpg){width=60%}  
 
-### Figure 3: Difference in Log~2~(Fold-Change) (Top 100 Genes)
+
+### Figure 2: Difference in Log~2~(Fold-Change) (Top 100 Genes)
+Figure 2 displays A) Log~2~(Fold-Change) from each model plotted against each other; B & C) histograms of the difference in Log~2~(Fold-Change) estimates by subtracting the estimate of Model P from the estimate from Model A. 
 
 ```{r fig.height=8, fig.width=10}
 #############Plots of change in log2fc##################
+#Cutoff
+AB_res <- AB_res %>% 
+  filter(abs(Estimate_A) > 2)
+#subset the top 100
+top_100_genes_AB <- AB_res %>% arrange(FDR_A) %>% .[1:100,]
+
 #Scatter Plot
-change_scatter <- cutoff_100_res %>% 
+change_scatter <- top_100_genes_AB %>% 
   ggplot(aes(x = Estimate_A, y = Estimate_B)) +
-  geom_point(col = case_when(cutoff_100_res$Estimate_A > 0 & cutoff_100_res$Estimate_B < 0 ~ 'red',
-                             cutoff_100_res$Estimate_A < 0 & cutoff_100_res$Estimate_B > 0 ~ 'red',
+  geom_point(col = case_when(top_100_genes_AB$Estimate_A > 0 & top_100_genes_AB$Estimate_B < 0 ~ 'red',
+                             top_100_genes_AB$Estimate_A < 0 & top_100_genes_AB$Estimate_B > 0 ~ 'red',
                              TRUE ~ 'black')) +
   geom_abline(intercept = 0, slope = 1, linetype = 2, col = 'red')+
   labs(x = "Estimate (Model A)",
-       y = "Estimate (Model B)",
+       y = "Estimate (Model P)",
        title = "A")
 
 #Histogram of difference
-diff_hist <- cutoff_100_res %>% 
+diff_hist <- top_100_genes_AB %>% 
   ggplot(aes(x = Estimate_Difference)) +
   geom_histogram(col = 'white', binwidth = 0.25) +
   scale_x_continuous(breaks = seq(-1.5, 1.5, 0.5)) +
@@ -171,10 +171,10 @@ diff_hist <- cutoff_100_res %>%
        title = "B")
 
 #Histogram of % change
-p_diff_hist <- cutoff_100_res %>% 
-  ggplot(aes(x = fold_change_diff_p)) +
-  geom_histogram(col = 'white', binwidth = 0.1) +
-  scale_x_continuous(breaks = seq(-1, 1, 0.25)) +
+p_diff_hist <- top_100_genes_AB %>% 
+  ggplot(aes(x = Estimate_P_Difference)) +
+  geom_histogram(col = 'white', binwidth = 10) +
+  scale_x_continuous(breaks = seq(-100, 100, 25)) +
   geom_vline(xintercept = 0, linetype = 2, col = 'red') +
   labs(x = "Difference (%)",
        y = "Count",
@@ -183,77 +183,60 @@ p_diff_hist <- cutoff_100_res %>%
 ggarrange(change_scatter, ggarrange(diff_hist, p_diff_hist, ncol = 2, nrow = 1, legend = "none"), nrow = 2, common.legend = T, legend = "bottom")
 ```
 
-*Table 2: Top 10 Significant Genes Models A & B*
+*Table 1: Top 10 Significant Genes Models A & p*
 
 ```{r}
-cutoff_100_res[1:10,] %>% 
-  mutate(fold_change_diff_p = fold_change_diff_p*100) %>% 
-  select(Gene, Gene_Name, Gene_Type, Estimate_A, Estimate_B, Estimate_Difference, fold_change_diff_p, FDR_A, FDR_B) %>% 
+top_100_genes_AB[1:10,] %>% 
+  dplyr::select(Gene, Gene_Name, Gene_Type, Estimate_A, Estimate_B, Estimate_Difference, Estimate_P_Difference, FDR_A, FDR_B) %>% 
   mutate(FDR_A = if_else(FDR_A < 0.001, "< 0.001", as.character(round(FDR_A,3))),
-         FDR_B = if_else(FDR_B < 0.001, "< 0.001", as.character(round(FDR_B,3)))) %>% 
-  dplyr::rename("Ensemble ID" = Gene,
-                "Gene Name" = Gene_Name,
-                "Gene Type" = Gene_Type,
-                "Estimate (Mod A)" = Estimate_A,
-                "Estimate (Mod B)" = Estimate_B,
-                "Estimate Difference" = Estimate_Difference,
-                "Esimate Difference (%)" = fold_change_diff_p,
-                "FDR (Mod A)" = FDR_A,
-                "FDR (Mod B)" = FDR_B) %>% 
+         FDR_B = if_else(FDR_B < 0.001, "< 0.001", as.character(round(FDR_B,3))),
+         Gene = gsub("\\..*", "", Gene)) %>% 
+  dplyr::rename(Percent_Difference = Estimate_P_Difference,
+                FDR_P = FDR_B) %>% 
   kablize(.,digits = 3)
 ```
-These results demonstrate that Sample 12 has a down-regulating effect on gene expression. That effect does not make a large difference in the number of significant genes or the direction of their effect. Figure 4 parallels Plot A in Figure 3, but includes the top 2000 genes to visualize this trend. 
+These results demonstrate that estimates increase when looking only at subjects from Pueblo. That effect does not make a large difference in the number of significant genes or the direction of their effect.  
 
-### Figure 4: Figure 3: Difference in Log~2~(Fold-Change) (Top 2000 Genes)
+### Figure 3: Difference in Log~2~(Fold-Change) (Top 2000 Genes)
+Figure 3 parallels Plot A in Figure 3, but includes the top 2000 genes to visualize this trend.
 ```{r}
 #Get the top 2000 genes
-top_1000 <- AB_res[1:1000,]
-
-#Make Tidy Results
-res_1000 <- top_1000 %>% 
-  dplyr::mutate(fold_change_diff = log2FoldChange.modB - log2FoldChange.modA,
-                fold_change_diff_p = (log2FoldChange.modB - log2FoldChange.modA)/log2FoldChange.modA) %>% 
-  dplyr::select(ensg, gene_name, gene_type, log2FoldChange.modA, log2FoldChange.modB, fold_change_diff, fold_change_diff_p, padj.modA, padj.modB) %>% 
-  dplyr::rename(Gene = ensg,
-                Gene_Name = gene_name,
-                Gene_Type = gene_type,
-                Estimate_A = log2FoldChange.modA,
-                Estimate_B = log2FoldChange.modB,
-                Estimate_Difference = fold_change_diff,
-                FDR_A = padj.modA,
-                FDR_B = padj.modB)
+top_1000 <- AB_res_no_cutoff[1:2000,]
 
 #Scatter Plot
-change_scatter <- res_1000 %>% 
+change_scatter <- top_1000 %>% 
   ggplot(aes(x = Estimate_A, y = Estimate_B)) +
   geom_point() +
-  geom_abline(aes(intercept = 0, slope = 1, col = "A = B"), linetype = 2)+
+  geom_abline(aes(intercept = 0, slope = 1, col = "Equal Estimates"), linetype = 2)+
   labs(x = "Estimate (Model A)",
-       y = "Estimate (Model B)",
-       title = "A")+
+       y = "Estimate (Model P)") +
   scale_x_continuous(breaks = seq(-10,10,2)) +
   scale_y_continuous(breaks = seq(-10,10,2)) +
-  scale_color_manual(name = "Guides", values = c("A = B" = "red"))
+  scale_color_manual(name = "Guides", values = c("Equal Estimates" = "red"))
 change_scatter
 ```
 
-Figure 5 similarly visualizes the trend by plotting -log~10~(p-value) for each of the models plotted against each other.
+There is a small amount of variability present in the estimates; however, a majority of the estimates are clustered around the line representing equal estimates. 
 
-### Figure 5: -log~10~(p-value) Model A vs. Model B
+### Figure 4: -log~10~(p-value) Model A vs. Model P
+
+Figure 4 similarly visualizes the trend by plotting -log~10~(p-value) for each of the models plotted against each other.
 ```{r}
 top_1000 %>% 
-  ggplot(aes(x = -log10(padj.modA), y = -log10(padj.modB))) +
+  ggplot(aes(x = -log10(FDR_A), y = -log10(FDR_B))) +
   geom_point() +
-  geom_abline(aes(intercept = 0, slope = 1, col = 'A = B'), linetype = 2)+
-  scale_color_manual(name = "Guides", values = c("A = B" = "red")) +
+  geom_abline(aes(intercept = 0, slope = 1, col = 'Equal P-values'), linetype = 2)+
+  scale_color_manual(name = "Guides", values = c("Equal P-values" = "red")) +
+  scale_y_continuous(breaks = seq(0,40,10)) +
   labs(x = "-log10(p-value A)",
-       y = "-log10(p-value B)")
+       y = "-log10(p-value P)")
 ```
 
+Excluding subjects that are not from Pueblo from the model additionally inflates p-values. P-values are already very small, so a small increase in p-values does not change the overall composition of significant genes.
 
 # Conclusion
 
-When looking at only the top 100 genes as determined by FDR-adjusted P-values, all genes retain significance from Model A to Model B. From the series of visualizations presented in the report, Sample 12 down-regulates gene expression overall, but does not significantly change the composition of significantly expressed genes. Sample 12 will be kept for further analyses to additionally help maintain power; however, it's role in down-regulating gene expression should be considered. 
+When looking at only the top 100 genes as determined by FDR-adjusted P-values, all genes retain significance from Model A to Model P. From the series of visualizations presented in the report, excluding subjects from recruitment centers other than Pueblo decreases |Log~2~(Fold-Change)| estimates, but does not significantly change the composition of significantly expressed genes. Looking at at a larger subset of the top genes confirms that estimates are decreased overall when excluding subjects not recruited at the Pueblo center. Since excluding those samples does not change the composition or direction of |Log~2~(Fold-Change)| estimates, further analyses will include all (n = 47) subjects. 
 
  <!-- footer -->
 

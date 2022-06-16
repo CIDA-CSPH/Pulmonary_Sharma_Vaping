@@ -129,7 +129,7 @@ de_res_tidy <- function(run_de, de_res, col_data) {
 #tidy results for plotting (RUV-Normalized)
 ruv_res_tidy <- function(ruv_count_dat, de_res, col_data, annotation) {
   #Get top 4 genes of interest
-  genes_of_interest <- de_res$ensg[1:100]
+  genes_of_interest <- de_res$ensg[1:4]
   
   #Join and tidy
   norm_counts<- t(log10((ruv_count_dat[genes_of_interest,] +.5))) %>%

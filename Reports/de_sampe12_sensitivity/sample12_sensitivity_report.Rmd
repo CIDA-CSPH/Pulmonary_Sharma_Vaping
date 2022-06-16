@@ -199,7 +199,7 @@ cutoff_100_res <- cutoff_100 %>%
 
 The top 100 significant genes in models A & B are identical both before and after the selected cutoff value (|Log~2~(Fold-Change)| > 2). A Venn Diagram of these would be trivial (a single circle), so Figure 2 shows the breakdown of the significant genes in Models A and B.  
 
-![](/Users/hawkjona/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/CIDA/Sharma_Vape_Local/figures/sample12_sens_venn.jpg)
+![](/Users/hawkjona/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/CIDA/Sharma_Vape_Local/figures/sample12_sens_venn.jpg){width=50%}  
 One feature that is not yet well understood is that there are a large number of significant genes in both models (>6000).  
 
 ### Figure 3: Difference in |Log~2~(Fold-Change)| (Top 100 Genes)
@@ -313,9 +313,47 @@ top_2000 %>%
 
 Excluding sample 12 from the model additionally inflates p-values. P-values are already very small, so smaller p-values do not necessarily change the overall composition of significant genes.
 
+### Figure 6: Boxplots of Top Genes (RUVr-Normalized Counts)
+
+```{r fig.height=6, fig.width=8}
+full_ruv_tidy <- read_csv(here("DataProcessed/de_full/top4_vape_ruv_normcounts_2022_06_14.csv")) 
+ruv_tidy_no12 <- read_csv(here("DataProcessed/de_sample12_sensitivity/RUV_Vape_Results_no12_2022_06_14.csv"))
+
+ruv_tidy_no12 <- ruv_tidy_no12 %>% 
+  filter(ruv_tidy_no12$gene %in% full_ruv_tidy$gene)
+
+#Results Boxplots (Vape and Center, Vape Only, Center Only)
+tcount_boxplot <- function(tcounts, title) {
+  vape_colors <- brewer.pal(3,"Set2")
+  #Stratified by vape status only
+  vape_box <- tcounts %>% 
+    ggplot(aes(vape_6mo_lab, expression, fill= vape_6mo_lab)) + 
+    geom_boxplot() + 
+    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
+    labs(x="Vape Status (6 mo)", 
+         y="Expression (log(ruv-normalized counts)", 
+         fill = "Vape Status (6 mo)", 
+         title= title) +
+    scale_fill_manual(values = vape_colors) +
+    facet_wrap(~symbol, scales="free_y") +
+    theme(axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          legend.position = "bottom")
+  
+  return(vape_box)
+}
+
+full_boxplots <- tcount_boxplot(full_ruv_tidy, "Model A")
+no12_boxplots <- tcount_boxplot(ruv_tidy_no12, "Model B")
+
+ggarrange(full_boxplots, no12_boxplots, nrow = 1, ncol = 2)
+```
+
+Figure 6 demonstrates that estimates of expression for Sample 12 are consistently low. Thus, the patterns seen in figures 4 and 5 are consistent with boxplots for gene expression. 
+
 # Conclusion
 
-When looking at only the top 100 genes as determined by FDR-adjusted P-values, all genes retain significance from Model A to Model B. From the series of visualizations presented in the report, excluding sample 12 inflates |Log~2~(Fold-Change)| estimates, but does not significantly change the composition of significantly expressed genes. Looking at at a larger subset of the top genes confirms that estimates are inflated overall when excluding sample 12. Since excluding the sample does not change the composition or directionality of |Log~2~(Fold-Change)| estimates, sample 12. 
+When looking at only the top 100 genes as determined by FDR-adjusted P-values, all genes retain significance from Model A to Model B. From the series of visualizations presented in the report, excluding sample 12 inflates |Log~2~(Fold-Change)| estimates, but does not significantly change the composition of significantly expressed genes. Looking at at a larger subset of the top genes confirms that estimates are inflated overall when excluding sample 12. Since excluding the sample does not change the composition or direction of |Log~2~(Fold-Change)| estimates, sample 12 will be included in all analyses. 
 
  <!-- footer -->
 

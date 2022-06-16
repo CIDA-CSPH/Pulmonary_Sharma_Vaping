@@ -1,0 +1,73 @@
+---
+title: 'Functional Enrichment Analysis'
+author: |
+ | Project: `r CIDAtools::ProjectName()`
+ |
+ | Analyst: `r CIDAtools::ProjectAnalyst()`
+ |
+ | Investigator(s): `r CIDAtools::ProjectPI()`
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+output:
+  html_document:
+    highlight: espresso
+    number_sections: yes
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(table1)
+library(diffEnrich)
+library(here)
+```
+
+# Project Summary
+
+# Introduction
+
+Introductory Text
+
+# Methods
+
+Functional Enrichment was run twice. Once using a list of the top 200 genes as determined by FDR-adjusted p-values, and once using a list of the top 200 genes as determined by FDR-adjusted p-values after sub-setting the results by |Log~2~(Fold-Change)| > 2. All analyses were performed using the `diffEnrich` package, which uses pathways defined by KEGG. For both of the gene lists mentioned, the background gene list was subset to include only the genes tested by the *Vape Status* model presented in previous reports. 
+
+# Results 
+```{r}
+source(here("Code/07_Functional_Enrichment.R"))
+source(here("Code/07a_Functional_Enrichment_no_cutoff.R"))
+
+
+```
+
+## Main Analysis
+
+# Conclusions
+
+Interpretations, discussion
+
+# References
+
+# Appendix
+
+<!-- footer -->
+
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```
+
