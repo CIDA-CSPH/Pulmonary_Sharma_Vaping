@@ -54,7 +54,7 @@ The breakdown of study participants shows that 12 of the 13 (92%) of vapers recr
 
 # Methods
 
-To assess the difference in model outputs, the following model was fit in DESeq2 `r package.version("DESeq2")` with all of the recruited subjects and again with only the subjects from the Pueblo recruitment center. Likelihood Ratio Tests (LRTs) were implemented to test for gene significance and corrected with FDR = 0.05. For the purpose of this report, the model containing all subjects will be referred to as *Model A* and the model with only participants from the Pueblo recruitment center will be referred to as *Model P*.
+To assess the difference in model outputs, the following model was fit in DESeq2 ver. `r package.version("DESeq2")` with all of the recruited subjects and again with only the subjects from the Pueblo recruitment center. Likelihood Ratio Tests (LRTs) were implemented to test for gene significance and corrected with FDR $\le$ 0.05. For the purpose of this report, the model containing all subjects will be referred to as *Model A* and the model with only participants from the Pueblo recruitment center will be referred to as *Model P*.
 
 $$Full \ Model \\ raw \ read \ count \sim vape \ status + recruitment \ center + sex + age + ruv_1 + ruv_2$$
 
@@ -65,7 +65,7 @@ When fitting the model for only the subjects recruited in Pueblo, the *recruitme
 To assess the difference in the models, the results will focus on genes with relatively low variability. To achieve a stable subset, a cutoff value of |Log~2~(Fold-Change)| > 2 will be used (see "sample12_sensitivity_report" for details). This report will present:\
 <br/>
 
-1.  A Venn Diagram summarizing the top 100 genes in each model.\
+1.  A Venn Diagram summarizing the top 100 genes in each model and all genes.\
     <br/>
 2.  Visualizations comparing |Log~2~(Fold-Change)| estimates and p-values between the two models.\
     <br/>
@@ -73,7 +73,7 @@ To assess the difference in the models, the results will focus on genes with rel
 
 # Results
 
-The top 100 genes determined by the FDR-adjusted p-value were subset from Model A to compare to Model P. This comparison shows that the top 100 genes in Model A are identical to the top 100 genes in Model P. 
+The top 100 genes determined by FDR were subset from Model A to compare to Model P. This comparison shows that the top 100 genes in Model A are identical to the top 100 genes in Model P. 
 ```{r fig.width=12}
 #############Read in results###################
 modA_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
@@ -191,8 +191,15 @@ top_100_genes_AB[1:10,] %>%
   mutate(FDR_A = if_else(FDR_A < 0.001, "< 0.001", as.character(round(FDR_A,3))),
          FDR_B = if_else(FDR_B < 0.001, "< 0.001", as.character(round(FDR_B,3))),
          Gene = gsub("\\..*", "", Gene)) %>% 
-  dplyr::rename(Percent_Difference = Estimate_P_Difference,
-                FDR_P = FDR_B) %>% 
+  dplyr::rename("Ensemble ID" = Gene,
+                "Gene Name" = Gene_Name,
+                "Gene Type" = Gene_Type,
+                "Log~2~(FC) (Mod A)" = Estimate_A,
+                "Log~2~(FC) (Mod B)" = Estimate_B,
+                "Log~2~(FC) Difference (B - A)" = Estimate_Difference,
+                "Log~2~(FC) Difference (%)" = Estimate_P_Difference,
+                "FDR (Mod A)" = FDR_A,
+                "FDR (Mod B)" = FDR_B) %>%
   kablize(.,digits = 3)
 ```
 These results demonstrate that estimates increase when looking only at subjects from Pueblo. That effect does not make a large difference in the number of significant genes or the direction of their effect.  
@@ -207,12 +214,12 @@ top_1000 <- AB_res_no_cutoff[1:2000,]
 change_scatter <- top_1000 %>% 
   ggplot(aes(x = Estimate_A, y = Estimate_B)) +
   geom_point() +
-  geom_abline(aes(intercept = 0, slope = 1, col = "Equal Estimates"), linetype = 2)+
-  labs(x = "Estimate (Model A)",
-       y = "Estimate (Model P)") +
+  geom_abline(aes(intercept = 0, slope = 1, col = "Equal Estimates"), linetype = 2, col = 'red')+
+  labs(x = "Log2(FC) (Model A)",
+       y = "Log2(FC) (Model P)") +
   scale_x_continuous(breaks = seq(-10,10,2)) +
   scale_y_continuous(breaks = seq(-10,10,2)) +
-  scale_color_manual(name = "Guides", values = c("Equal Estimates" = "red"))
+  scale_color_manual(name = "Guides", values = c("Equal Log2(FC)" = "red"))
 change_scatter
 ```
 

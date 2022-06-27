@@ -7,7 +7,12 @@ library(clusterProfiler)
 ################## Collect and store pathways from KEGG ###################
 kegg_hsa <- get_kegg('hsa', path = here("DataRaw/pathways"))
 
-key <- kegg_hsa$ncbi_to_kegg
+# ncbi_to_kegg <- read_tsv("DataRaw/pathways/ncbi_to_kegg2022-06-15Release_102.0+_06-15_Jun_22.txt")
+# kegg_to_pathway <- read_tsv("DataRaw/pathways/kegg_to_pathway2022-06-15Release_102.0+_06-15_Jun_22.txt")
+# pathway_to_species <- read_tsv("DataRaw/pathways/pathway_to_species2022-06-15Release_102.0+_06-15_Jun_22.txt")
+# 
+# kegg_hsa <- list(ncbi_to_kegg, kegg_to_pathway, pathway_to_species)
+# names(kegg_hsa) <- c("ncbi_to_kegg", "kegg_to_pathway", "pathway_to_species")
 ################## Read in tested genes################
 
 ################## Get Gene List and map to Entrez ID ####################

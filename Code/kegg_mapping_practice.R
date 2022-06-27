@@ -1,0 +1,7 @@
+library(org.Hs.eg.db)
+mapped <- mappedkeys(org.Hs.egPATH2EG)
+L <- as.list(org.Hs.egPATH2EG[mapped])
+Kegg_ID <- names(L)
+Gene_IDs <- sapply(L, paste, collapse=",")
+cbind(Kegg_ID, Gene_IDs)
+new_tab <- cbind(Kegg_ID, Gene_IDs)
