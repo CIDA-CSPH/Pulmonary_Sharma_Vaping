@@ -1,0 +1,64 @@
+---
+title: "Report"
+csl: numeric_citations.csl
+subtitle: "**Project**: `r CIDAtools::ProjectName()`  \n**Analyst**: `r CIDAtools::ProjectAnalyst()`   \n**Investigator**(s): `r CIDAtools::ProjectPI()`  \n **Date**: `r paste(format(Sys.Date(), '%B %d, %Y'))`"
+output: 
+  word_document:
+    toc: false
+    reference_docx: word_style.docx 
+bibliography: bib.bib
+---
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(arsenal)
+```
+
+# Project Summary
+
+# Introduction
+
+Introduction text, here is a reference: [@mice].
+
+# Methods
+
+Methods text
+
+# Results 
+
+## Descriptive Statistics
+
+Tables/Figures/Results section
+
+*Figure 1*
+```{r}
+data("cars")
+plot(cars$speed, cars$dist, pch = 20)
+```
+
+*Table 1*
+```{r, results = "asis"}
+
+# See https://cran.r-project.org/web/packages/table1/vignettes/table1-examples.html
+cars$group <- paste0("Group " , rep(1:2,25))
+
+tab1 <- tableby(group~., data = cars)
+summary(tab1)
+```
+
+
+## Main Analysis
+
+# Conclusions
+
+Interpretations, discussion
+
+# References
+
+# Appendix
+
