@@ -1,0 +1,208 @@
+---
+title: ''
+author: |
+ | Project: `r CIDAtools::ProjectName()`
+ |
+ | Analyst: `r CIDAtools::ProjectAnalyst()`
+ |
+ | Investigator(s): `r CIDAtools::ProjectPI()`
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+output:
+  html_document:
+    highlight: espresso
+    number_sections: no
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+    code_folding: hide
+bibliography: sharma_vape.bibtex
+csl: https://raw.githubusercontent.com/citation-style-language/styles/d8423d84cd58eeb4f1e2c07d2b4102791d95b8f6/apa.csl
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+------------------------------------------------------------------------
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = F, warning = F, error = F, fig.align = 'center')
+library(tidyverse)
+library(here)
+library(diffEnrich)
+library(clusterProfiler)
+library(fgsea)
+library(reactome.db)
+library(biomaRt)
+library(kableExtra)
+
+
+#############Table Version of Venn Diagram##################
+kablize <- function(tab, digits = 3) {
+  kable(tab,digits = digits, booktabs = T) %>% 
+  kableExtra::kable_styling(latex_options = c("hold_position", "striped"), position = "center")
+}
+
+format_num <- function(number, digits = 0, format = "f") {
+  formatC(number, digits = digits, format = format, big.mark = ",")
+}
+```
+
+# Introduction
+
+The purpose of this report is to identify differentially enriched biological pathways using Gene Set Enrichment Analysis (GSEA) informed by differential gene expression results (see 'teen_vape_DE_report').
+
+# Methods
+
+GSEA requires the input of both a ranked list of genes and a list of biological pathways with their associated genes. For ease of comparison with various pathways, genes were mapped from ENSEMBL ID's to ENTREZ (NCBI) ID's. All GSEA analysis was conducted using the R package `fGSEA` ver. `r package.version("fGSEA")`.
+
+**Ranks**\
+The genes for this analysis arise from the differential expression analysis (see 'teen_vape_DE_report', 'de_pueblo_sensitivity', 'sample_12_sensitivity_report'). A filter for $|\log_2(FC)| > 2$ was applied as in previous sensitivity analyses. Ranks were calculated as:
+
+$$Rank = sign(\log_2(FC)) * -(\log_{10}(p\textrm{-}value))$$
+
+using the fold-change estimate and associated p-value from differential expression analysis [@xiao2012].
+
+**Pathways**\
+We completed GSEA for three different pathway collections:
+
+1.  Koyoto Encyclopedia of Genes and Genomes (KEGG)
+2.  Reactome
+3.  Gene Ontology (GO)
+
+All pathways were retrieved from Ensembl (ver. 106) using `biomaRt` ver. `r package.version("biomaRt")` [@cunningham2021].
+
+Only pathways with $\ge 2$ ENTREZ genes were considered for GSEA. After the initial analysis, we determined *statistically* independent pathways using the function `collapsePathways` from `fGSEA`.
+
+Some definitions specific to these results provided by @subramanian2005 are as follows:
+
+-   [Enrichment Score (ES)]{.underline}: the degree that the gene set for the pathway is over-represented
+
+-   [Normalized Enrichment Score (NES)]{.underline}: the enrichment score normalized to the mean enrichment of random samples of the same size. This value allows for comparisons among pathways.
+
+-   [Size]{.underline}: number of genes in the 'leading edge'
+
+-   [Leading Edge]{.underline}: Genes that account for the gene set's enrichment signal
+
+Results presented in this report have been simplified to include only the number of up-regulated and down-regulated genes. Specifics about leading edge genes and which are up- or down-regulated can be found in the supplementary documentation.
+
+# Results
+
+```{r}
+
+```
+
+4228 Ensembl genes mapped to 3690 ENTREZ genes with 12.8% failing to map. All 3690 ENTREZ genes were included in GSEA.
+
+*Definitions*
+
+-   [Paths Tested]{.underline}: Total pathways tested
+
+-   [Genes Matched]{.underline}: Total genes matched to ***any*** tested pathway
+
+-   [Independent Pathways]{.underline}: Number of pathways after 'collapsing' to include only ***statistically*** independent pathways
+
+-   [FDR]{.underline}: Total significant pathways at the indicated level
+
+```{r}
+#Read in results
+kegg_ind <- read_csv(here("DataProcessed/gsea_res/kegg_results_2022_07_05.csv"))
+react_ind <- read_csv(here("DataProcessed/gsea_res/react_results_2022_07_05.csv"))
+go_ind <- read_csv(here("DataProcessed/gsea_res/go_results_2022_07_05.csv"))
+
+#Summary table
+get_paths_res <- function(res_ind) {
+  paths_tested <- as.numeric(nrow(res_ind))
+  
+  ind_paths <- sum(is.na(res_ind$independent_path))
+  
+  genes_matched <- length(unique(strsplit(res_ind[["leadingEdge"]], split = ', ')))
+  
+  sig_paths_05 <- as.numeric(nrow(res_ind %>% dplyr::filter(padj < 0.05)))
+  
+  sig_paths_10 <- as.numeric(nrow(res_ind %>% dplyr::filter(padj < 0.1)))
+  
+  sig_paths_20 <- as.numeric(nrow(res_ind %>% dplyr::filter(padj < 0.2)))
+  
+  return(c(format_num(paths_tested), format_num(genes_matched), ind_paths, sig_paths_05, sig_paths_10, sig_paths_20))
+}
+
+kegg_sum <- get_paths_res(kegg_ind)
+
+react_sum <- get_paths_res(react_ind)
+
+go_sum <- get_paths_res(go_ind)
+
+paths_res <- rbind(kegg_sum, react_sum, go_sum)
+
+rownames(paths_res) <- c("KEGG", "Reactome", "GO")
+colnames(paths_res) <- c("Paths Tested",  "Genes Matched", "Independent Pathways", "FDR < 0.05", "FDR < 0.1", "FDR < 0.2")
+
+paths_res %>% kablize()
+```
+
+The remaining results are specific to each pathway collection. Only the top 10 pathways (determined by FDR) are presented. Full results can be found in the supplementary documentation.
+
+## KEGG
+
+```{r fig.width=10}
+format_tab <- function(res_ind) {
+  
+  res_ind <- res_ind %>% 
+    arrange(padj, pval)
+  
+  res_ind %>% 
+    dplyr::select(-c(leadingEdge, positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
+    dplyr::mutate(ES = round(ES, 2),
+                  NES = round(NES, 2),
+                  pval = if_else(pval < 0.001, '<0.001', as.character(round(pval, 3))),
+                  padj = if_else(padj < 0.001, '<0.001', as.character(round(padj, 3))),
+                  independent_path = if_else(is.na(independent_path), "Ind", independent_path)) %>%
+    dplyr::rename("Dependent Pathway" = pathway,
+                  "Independent Pathway" = independent_path,
+                  FDR = padj,
+                  "Up-Regulated Genes" = positive_length,
+                  "Down-Regulated Genes" = negative_length) %>% 
+    
+    .[1:10,] %>% 
+    kablize()
+}
+#Fix independent Pathways
+kegg_ind$pathway <- gsub(".{23}$", "", kegg_ind$pathway)
+
+kegg_ind$independent_path <- gsub(".{23}$", "", kegg_ind$independent_path)
+
+format_tab(kegg_ind)
+```
+
+## Reactome
+
+```{r}
+format_tab(react_ind)
+```
+
+## GO
+
+```{r}
+format_tab(go_ind)
+```
+
+# Conclusion
+
+A pattern in the results is that genes within a particular pathway are all regulated in the same direction (either all up- or all down-regulated). This relationship is expected. Leading edge genes are the genes from the gene set which appear in the ranked list at or before the point where the enrichment score reaches its maximum deviation from 0 (i.e. the enrichment score reported in the table above) [@subramanian2005]. Those genes will tend to cluster at one side. Pathways with reference to both cilium and the cornified envelope are recurrent in both the Reactome and GO collections. These along with some of the other pathways with FDR \< 0.05 are worthy of further investigation.
+
+# References
+
+::: {#refs}
+:::
+
+<!-- footer -->
+
+------------------------------------------------------------------------
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```

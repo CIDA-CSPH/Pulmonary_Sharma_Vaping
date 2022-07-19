@@ -10,11 +10,11 @@ library(kableExtra)
 
 kablize <- function(tab, digits = 3) {
   kable(tab,digits = digits, booktabs = T) %>% 
-    kableExtra::kable_styling(latex_options = c("hold_position", "striped"), position = "center")
+    kableExtra::kable_styling(latex_options = c("scale_down", "striped"), position = "center")
 }
 
-format_num <- function(number, digits = 0) {
-  formatC(number, digits = digits, format = "f", big.mark = ",")
+format_num <- function(number, digits = 0, format = "f") {
+  formatC(number, digits = digits, format = format, big.mark = ",")
 }
 ################## Read in results #################
 vape_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
@@ -22,15 +22,17 @@ vape_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
 #Fix Ensemble ID's  and join with symbols
 vape_res$ensg <- gsub("\\..*", "", vape_res$ensg)
 
+################# log2(FC) > 2 ############################
+vape_res <- vape_res %>% 
+  dplyr::filter(abs(log2FoldChange) > 2) %>% 
+  dplyr::arrange(padj)
+
 #translate to ENTREZ
 genes_tested <- bitr(vape_res$ensg, fromType = "ENSEMBL", toType="ENTREZID", OrgDb="org.Hs.eg.db")
 
 vape_res <- left_join(vape_res, genes_tested, by = c("ensg" = "ENSEMBL"))
 
-################# log2(FC) > 2 ############################
-vape_res <- vape_res %>% 
-  dplyr::filter(abs(log2FoldChange) > 2) %>% 
-  dplyr::arrange(padj)
+
 
 ################# Get Ranks ############################
 #Make Ranks
@@ -88,7 +90,7 @@ names(kegg_pathways) <- kegg_key_mapped$name
 react_path <- reactomePathways(names(ranks_entrez))
 
 ############################# Gene Ontology ####################################
-# hsa_ensembl <- useMart("ensembl",dataset="hsapiens_gene_ensembl")
+#hsa_ensembl <- useMart("ensembl",dataset="hsapiens_gene_ensembl")
 
 go_key <- read_rds(here("DataRaw/pathways/go_mart_2022_06_20.rds"))
 
@@ -125,7 +127,7 @@ kegg_res <- fgsea(pathways = kegg_pathways,
                     stats = ranks_entrez,
                     minSize = 2,
                     maxSize = 500,
-                    nPermSimple = 100000)
+                    nPermSimple = 1000)
 #React
 react_res <- fgsea(pathways = react_path,
                      stats = ranks_entrez,
@@ -139,9 +141,8 @@ go_res <- fgsea(pathways = go_pathways,
                   maxSize = 500,
                   nPermSimple = 100000)
 
-res_collapse <- collapsePathways(fgseaRes = kegg_res, 
-                                 pathways = kegg_pathways,
-                                 stats = ranks_entrez)
+
+
 ###################### Match up/clean/format results with Gene Names############
 
 format_res <- function(result, path, ranks) {
@@ -150,13 +151,20 @@ format_res <- function(result, path, ranks) {
                                    pathways = path,
                                    stats = ranks)
   
-  res_ind <- result[pathway %in% res_collapse$mainPathways,]
+  #Save the independent path that the dependent path collapses into
+  ind_path <- tibble(pathway = names(res_collapse$parentPathways),
+                     independent_path = res_collapse$parentPathways)
   
-  entrez_genes <- unique(unlist(res_ind[["leadingEdge"]]))
+  #map to the independent pathway
+  result <- left_join(result, ind_path, by = "pathway")
+  
+  #Map entrez ID's to symbol
+  entrez_genes <- unique(unlist(result[["leadingEdge"]]))
   
   symbol_map <- bitr(entrez_genes, fromType = "ENTREZID", 
                      toType = "SYMBOL", OrgDb="org.Hs.eg.db")
   
+  #Prepare vectors to store gene info
   positive_entrez <- NULL
   
   negative_entrez <- NULL
@@ -169,46 +177,57 @@ format_res <- function(result, path, ranks) {
   
   negative_length <- NULL
   
-  for (i in 1:nrow(res_ind)) {
-    entrez_temp <- unique(unlist(res_ind[i,"leadingEdge"]))
-    
+  leadingEdge_unlist <- NULL
+  
+  for (i in 1:nrow(result)) {
+    #Get the entrez gene list for the pathway
+    entrez_temp <- unique(unlist(result[i,"leadingEdge"]))
+    #Subset the diff exp results 
     vape_res_temp <- vape_res[vape_res$ENTREZID %in% entrez_temp,]
-    
+    #Figure out if log2 FC is + or -
     positive_genes_temp <- vape_res_temp[vape_res_temp$log2FoldChange > 0, c('ENTREZID','gene_name')]
     
     negative_genes_temp <- vape_res_temp[vape_res_temp$log2FoldChange < 0, c('ENTREZID','gene_name')]
+    #Positive Genes
+    positive_entrez <- append(positive_entrez, paste0(positive_genes_temp$ENTREZID, collapse = ', '))
     
-    positive_entrez <- append(positive_entrez, list(positive_genes_temp$ENTREZID))
-    
-    negative_entrez <- append(negative_entrez, list(negative_genes_temp$ENTREZID))
-    
-    positive_symbol <- append(positive_symbol, list(positive_genes_temp$gene_name))
-    
-    negative_symbol <- append(negative_symbol, list(negative_genes_temp$gene_name))
+    positive_symbol <- append(positive_symbol, paste0(positive_genes_temp$gene_name, collapse = ', '))
     
     positive_length <- append(positive_length, length(positive_genes_temp$ENTREZID))
     
-    negative_length <- append(negative_length, length(negative_genes_temp$ENTREZID))
+    #Negative Genes
+    negative_entrez <- append(negative_entrez, paste0(negative_genes_temp$ENTREZID, collapse = ', '))
   
-    print(positive_length)
+    negative_symbol <- append(negative_symbol, paste0(negative_genes_temp$gene_name, collapse = ', '))
+    
+    negative_length <- append(negative_length, length(negative_genes_temp$ENTREZID))
+    
+    #fix leading edge
+    leadingEdge_unlist <- append(leadingEdge_unlist, paste0(unlist(result$leadingEdge[i]), collapse = ', '))
   }
   
-  res_ind[,'positive_entrez'] <- positive_entrez
+  #Add categorized genes to result
+  result[,'positive_entrez'] <- positive_entrez
 
-  res_ind[,'positive_symbol'] <- positive_symbol
+  result[,'positive_symbol'] <- positive_symbol
 
-  res_ind[,'negative_entrez'] <- negative_entrez
+  result[,'negative_entrez'] <- negative_entrez
 
-  res_ind[,'negative_symbol'] <- negative_symbol
+  result[,'negative_symbol'] <- negative_symbol
   
-  res_ind[,'positive_length'] <- positive_length
+  result[,'positive_length'] <- positive_length
   
-  res_ind[,'negative_length'] <- negative_length
+  result[,'negative_length'] <- negative_length
+  
+  result[,'leadingEdge'] <- leadingEdge_unlist
 
-  res_ind <- res_ind %>%
-    dplyr::select(pathway, pval, padj, ES, NES, size, leadingEdge, positive_entrez, positive_symbol,positive_length,
+  result <- result %>%
+    dplyr::select(pathway, independent_path, pval, padj, ES, NES, size, leadingEdge, 
+                  positive_entrez, positive_symbol, positive_length,
                   negative_entrez, negative_symbol, negative_length)
-  return(res_ind)}
+  return(result)}
+
+
 
 
 kegg_ind <- format_res(result = kegg_res,
@@ -259,48 +278,86 @@ paths_res %>%
 
 kegg_ind$pathway <- gsub(".{23}$", "", kegg_ind$pathway)
 
-kegg_res$pathway <- gsub(".{23}$", "", kegg_res$pathway)
+kegg_ind$independent_path <- gsub(".{23}$", "", kegg_ind$independent_path)
+
 
 
 #Top Results for each pathway
 
 format_tab <- function(res_ind) {
+  
+  res_ind <- res_ind %>% 
+    arrange(padj, pval)
+  
   res_ind %>% 
-    arrange(padj, pval) %>%
-    dplyr::select(-c(leadingEdge, positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
+    dplyr::select(-c(positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
     dplyr::mutate(ES = round(ES, 2),
                   NES = round(NES, 2),
-                  pval = if_else(pval < 0.001, '<0.001', as.character(round(pval, 3))),
-                  padj = if_else(padj < 0.001, '<0.001', as.character(round(padj, 3)))) %>%
+                  pval = if_else(pval < 0.001, format_num(pval, digits = 2, format = "e"), as.character(round(pval, 5))),
+                  padj = if_else(padj < 0.001, format_num(padj, digits = 2, format = "e"), as.character(round(padj, 5))),
+                  independent_path = if_else(is.na(independent_path), "Ind", independent_path)) %>%
     dplyr::rename(Pathway = pathway,
+                  "Independent Pathway" = independent_path,
                   FDR = padj,
                   "Up-Regulated Genes" = positive_length,
-                  "Down-Regulated Genes" = negative_length) %>% 
-    
-    .[1:10] %>% 
-    kablize()
+                  "Down-Regulated Genes" = negative_length) 
 }
 
-format_tab(kegg_ind)
+kegg_res_supplement <- format_tab(kegg_ind) 
 
-format_tab(react_ind)
+react_res_supplement <- format_tab(react_ind)
 
-format_tab(go_ind)
+go_res_suplement <- format_tab(go_ind)
 
+################# Format results for supplementary table ######################
+sup_table_maker <- function(res) {
+  #Make a row for each leading edge gene
+  long_tab <- res %>% 
+    separate_rows(leadingEdge, sep = ', ') %>% 
+    dplyr::arrange(padj)
+  
+  #For each gene find if it is up- or down-regulated
+  regulation <- NULL
+  
+  vape_res_rows <- match(as.numeric(long_tab$leadingEdge),
+                               vape_res$ENTREZID)
+  
+  symbol_match <- vape_res[vape_res_rows, "gene_name"]
+  
+  
+  #Format
+  long_tab <- long_tab %>% 
+    dplyr::select(-c(9:14)) %>% 
+    dplyr::mutate(regulation = if_else(vape_res[vape_res_rows, "log2FoldChange"] > 0, '+', '-'),
+                  independent_path = if_else(is.na(independent_path), "Ind", independent_path)) %>% 
+    left_join(vape_res, by = c("leadingEdge" = "ENTREZID"))
+  
+  print(head(long_tab))
+  long_tab <- long_tab %>% 
+    dplyr::select(pathway, independent_path, leadingEdge, 
+                  gene_name, log2FoldChange, regulation, pvalue, padj.y, padj.x)
+  
+  return(long_tab)
+}
+#Get supplementary tables
+kegg_res_full <- sup_table_maker(kegg_ind)
 
+react_res_full <- sup_table_maker(react_ind)
 
+go_res_full <- sup_table_maker(go_ind)
 
-plotEnrichment(kegg_pathways, ranks_entrez) +
-  labs(title = "KEGG Enrichment Score Across Ranks")
+colnames(kegg_res_full) <- c("Pathway", "Independent Pathway", "leadingEdge", "gene_name", "log2FoldChange", "regulation", "gene_level_pval", "gene_level_fdr", "path_level_fdr")
+colnames(react_res_full) <- c("Pathway", "Independent Pathway", "leadingEdge", "gene_name", "log2FoldChange", "regulation", "gene_level_pval", "gene_level_fdr", "path_level_fdr")
+colnames(go_res_full) <- c("Pathway", "Independent Pathway", "leadingEdge", "gene_name", "log2FoldChange", "regulation", "gene_level_pval", "gene_level_fdr", "path_level_fdr")
 
-plotEnrichment(react_path, ranks_entrez) +
-  labs(title = "Reactome Enrichment Score Across Ranks")
-
-plotEnrichment(go_pathways, ranks_entrez) +
-  labs(title = "GO Enrichment Score Across Ranks")
-
-plotGseaTable(kegg_pathways[kegg_ind$pathway[1:10]], ranks_entrez, kegg_ind)
-
-plotGseaTable(react_path[react_ind$pathway[1:10]], ranks_entrez, react_ind)
-
-plotGseaTable(go_pathways[go_ind$pathway[1:10]], ranks_entrez, go_ind)
+# #Write out kegg results 
+# list_of_datasets <- list("pathway_level" = kegg_res_supplement, "gene_level" = kegg_res_full)
+# writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea_res/kegg_full_res_2022_07_18.xlsx"))
+# 
+# #Write out react results 
+# list_of_datasets <- list("pathway_level" = react_res_supplement, "gene_level" = react_res_full)
+# writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea_res/react_full_res_2022_07_18.xlsx"))
+# 
+# #Write out go results 
+# list_of_datasets <- list("pathway_level" = go_res_suplement, "gene_level" = go_res_full)
+# writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea_res/go_full_res_2022_07_18.xlsx"))
