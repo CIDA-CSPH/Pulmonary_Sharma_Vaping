@@ -45,3 +45,4 @@ vignettes/*.pdf
 *.mdb
 *.DS_Store
 .DS_Store
+*.idat

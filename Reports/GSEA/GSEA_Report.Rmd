@@ -75,7 +75,7 @@ We completed GSEA for three different pathway collections:
 
 All pathways were retrieved from Ensembl (ver. 106) using `biomaRt` ver. `r package.version("biomaRt")` [@cunningham2021].
 
-Only pathways with $\ge 2$ ENTREZ genes were considered for GSEA. After the initial analysis, we determined *statistically* independent pathways using the function `collapsePathways` from `fGSEA`.
+Only pathways with $\ge 2$ ENTREZ genes were considered for GSEA. After the initial analysis, we determined redundant pathways using the function `collapsePathways` from `fGSEA` [@korotkevich2016]. This report refers to non-redundant pathways as 'independent' pathways throughout the report. It should be noted that this terminology refers only to the idea that some gene-sets are represented in multiple pathways. In this case, independence does **not** refer to biological relationships between pathways.
 
 Some definitions specific to these results provided by @subramanian2005 are as follows:
 
@@ -90,10 +90,6 @@ Some definitions specific to these results provided by @subramanian2005 are as f
 Results presented in this report have been simplified to include only the number of up-regulated and down-regulated genes. Specifics about leading edge genes and which are up- or down-regulated can be found in the supplementary documentation.
 
 # Results
-
-```{r}
-
-```
 
 4228 Ensembl genes mapped to 3690 ENTREZ genes with 12.8% failing to map. All 3690 ENTREZ genes were included in GSEA.
 
