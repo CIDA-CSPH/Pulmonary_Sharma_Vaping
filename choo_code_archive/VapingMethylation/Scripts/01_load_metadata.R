@@ -3,13 +3,14 @@
 date_export <-
   "20210326"
 
-setwd("/beevol/home/borengas/analyses/methylation")
-
 library(tidyverse)
 library(readxl)
 library(ggthemes)
 library(ggbeeswarm)
 library(cowplot)
+library(here)
+library(skimr)
+library(janitor)
 
 library(data.table)
 library(sesameData)
@@ -52,11 +53,11 @@ palette_shape_vaping <-
 # from Daniel
 # one sample ID = "DOO3" non-numeric
 dat_sample_qc <- 
-  read_excel("./Data/20201208/RNA-DNA extraction Vaping 11_23_2020.xlsx")
+  read_excel(here("Data/20201208/RNA-DNA extraction Vaping 11_23_2020.xlsx"))
 
 # corrected document, with concentrations
 dat_qc_RNA <-
-  read_excel("./Data/20201217/RNA numbers_Vaping Samples SS.xlsx") %>%
+  read_excel(here("Data/20201217/RNA numbers_Vaping Samples SS.xlsx")) %>%
   dplyr::slice(-1) %>%
   select(-1) %>%
   transmute(SID = `...3`,
@@ -67,7 +68,7 @@ dat_qc_RNA <-
   filter(!is.na(`260/280`) & !is.na(SID))
 
 dat_participants <-
-  read_csv("./Data/20210325/all_data_Latino_Youth_survey_clean_pulmfxn_FINAL_3.23.21.csv")
+  read_csv(here("Data/20210325/all_data_Latino_Youth_survey_clean_pulmfxn_FINAL_3.23.21.csv"))
 
 
 
@@ -95,7 +96,16 @@ final_metadata <-
 
 
 
+#Load metadata
+id_relate <- read_tsv(file = here("Data/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
+metadata_unjoined <- read_csv(file = here("Data/table1_clean_data_2022_03_30.csv"))
 
+
+#Join metadata
+metadata_joined <- id_relate %>% 
+  mutate(new_id = str_pad(new_id, 2, "left", "0") %>% paste0("Sample", .)) %>% 
+  left_join(metadata_unjoined, by = "sid") %>% 
+  filter(new_id %in% final_metadata$NewID)
 
 # Possible Vaping Definitions --------------------------------------------------
 

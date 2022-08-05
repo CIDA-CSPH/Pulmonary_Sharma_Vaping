@@ -1,0 +1,82 @@
+---
+title: Methylation Preprocessing
+author: |
+ | Project: `r CIDAtools::ProjectName()`
+ |
+ | Analyst: `r CIDAtools::ProjectAnalyst()`
+ |
+ | Investigator(s): `r CIDAtools::ProjectPI()`
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+output:
+  html_document:
+    highlight: espresso
+    number_sections: yes
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+bibliography: methylation_ref.bib
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+------------------------------------------------------------------------
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(sesame)
+library(sesameData)
+library(Biobase)
+```
+
+# Introduction
+
+The purpose of this report is to document quality-control and data-normalization procedures followed before obtaining $\beta$-values which quantify methylation for the adolescent vaping study. Much of the code for this report had already been produced by the previous analyst, Cuining Liu. Further steps were taken to dissect the data-pipeline to support any decisions made moving forward.
+
+# Methods
+
+Methylation samples were taken using the 850K 'EPIC' array.
+
+## Quality Control
+
+All quality control steps were conducted using the package `SeSAMe` ver. `r package.version("sesame")`. The steps below are not necessarily presented in chronological order which they were taken. The order of pre-processing steps follows the `openSesame` data pipeline available [here](https://www.bioconductor.org/packages/release/bioc/vignettes/sesame/inst/doc/sesame.html#Preprocessing_Function_Code) [@zhou2018].
+
+**Sample Removal**\
+Samples will be evaluated for a low mean-intensity to identify potential outliers with low-quality methylation values. Outliers will be defined by samples in the bottom 1%.
+
+**Probe Removal**\
+The `SeSAMe` package uses probe 'masking' instead of probe removal. These terms are essentially interchangeable; however, it should be noted that 'masked' probes are not actually removed from the dataset. They are only ignored by `SeSAMe` when completing down-stream analyses. Probes are masked in two ways:
+
+1.  [Experiment-independent Probe Masking]{.underline}: Probes that are masked due to non-unique mapping or influence by SNPs.
+2.  [Experiment-dependent Probe Masking]{.underline}: Probes that are masked based on the detection p-value, which represents the probability of a detection signal being background flourescence. Masks are based on the detection p-value, which represents the probability of a detection signal being background fluorescence [@zhou2018].
+
+Experiment-independent probe masking is set by a pre-determined list of probes specific to the 'EPIC' array. Experiment -dependent probe masking will be determined by p-value threshold. CpG probes with a detection p-value \> 0.05 will be masked for the purpose of this study.
+
+**Data Transformations**\
+
+There are two data transformations within the `openSesame` pipeline. The first is a dye bias correction. The `openSesame` pipeline defaults to a non-linear correction which ensures that Infinium-I Red and Grn probes have the same distribution of signal. A visualization will detail this correction.  
+
+Other transformations to consider are background subtraction, channel inference, and Infinium-I/II matching. Background subtraction and channel inference are standard steps in the `openSesame` pipeline. A visualization of the distribution of $\beta$-values will aid in makind a decision about the use of Infinium-I/II matching.
+
+# Results
+
+# Conclusions
+
+Interpretations, discussion
+
+# References
+
+<!-- footer -->
+
+------------------------------------------------------------------------
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```

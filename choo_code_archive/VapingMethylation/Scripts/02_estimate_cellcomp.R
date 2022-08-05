@@ -1,8 +1,8 @@
-cd /beevol/home/borengas/analyses/methylation
-
-
-module load R/3.6.1
-R
+# cd /beevol/home/borengas/analyses/methylation
+# 
+# 
+# module load R/3.6.1
+# R
 
 
 # reload targets 01, but using minfi infrastructure for compatbility

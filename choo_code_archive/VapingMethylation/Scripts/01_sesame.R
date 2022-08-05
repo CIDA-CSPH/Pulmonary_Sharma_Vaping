@@ -7,12 +7,12 @@
 
 # server setup -----------------------------------------------------------------
 
-screen
-qlogin -R rusage[mem=48]
-cd /beevol/home/lincuini/analyses/
-  module load gcc/7.4.0
-module load R/4.0.3
-R
+# screen
+# qlogin -R rusage[mem=48]
+# cd /beevol/home/lincuini/analyses/
+#   module load gcc/7.4.0
+# module load R/4.0.3
+# R
 
 
 
@@ -28,11 +28,11 @@ library(khroma)
 
 
 # sample metadata --------------------------------------------------------------
-setwd("/beevol/home/lincuini/Analyses/VapingMethylation/")
-date_export <- "20210914"
-folder_raw_dat <-
-  "./Data/Idats/"
+# setwd("/beevol/home/lincuini/Analyses/VapingMethylation/")
+date_export <- "2022_07_27"
+folder_raw_dat <- "./Data/RawIdat/"
 
+#Reading in metadata and joining
 samplesheet <-
   left_join(
     read_csv("./Data/Metadata/SSharma_48_samplesheet_05202021.csv", skip = 7) %>%
@@ -54,6 +54,7 @@ samplesheet <-
 # file path example formats
 # Slide_1 _203784950100/203784950100_R01C01_Grn.idat
 
+# Getting filename, barcode, and position for each subject and then joining to metadata by barcode and position
 targets <-
   tibble(file_path =
            list.files(path = folder_raw_dat, pattern = "*.idat|*.IDAT",
@@ -65,40 +66,43 @@ targets <-
   mutate(file_path_prefix = gsub("_Red.idat|_Grn.idat", "", file_path) %>%
            paste0(folder_raw_dat, .)) %>%
   filter(!duplicated(file_path_prefix)) #%>% # duplicated prefix due to Red/Grn
-  # left_join(assay_scan_date, by = "EPIC_chip") %>%
-  # mutate(EPIC_WellPairs = EPIC_row %>% as.factor() %>%
-  #          fct_collapse(`1/2` = c("R01C01", "R02C01"),
-  #                       `3/4` = c("R03C01", "R04C01"),
-  #                       `5/6` = c("R05C01", "R06C01"),
-  #                       `7/8` = c("R07C01", "R08C01")))
-  # 
+# left_join(assay_scan_date, by = "EPIC_chip") %>%
+# mutate(EPIC_WellPairs = EPIC_row %>% as.factor() %>%
+#          fct_collapse(`1/2` = c("R01C01", "R02C01"),
+#                       `3/4` = c("R03C01", "R04C01"),
+#                       `5/6` = c("R05C01", "R06C01"),
+#                       `7/8` = c("R07C01", "R08C01")))
+# 
 
 
+#We are using the EPIC array
+sesameDataCache("EPIC")
 
-# sesameDataCache("EPIC")
 
+#Reading in the idat files 
+methylation_raw <- map(targets$file_path_prefix, readIDATpair)
 
+#Try another 
 
-methylation_raw <- 
-  map(targets$file_path_prefix, readIDATpair)
-
-sesame_qc <-
-  methylation_raw %>%
+#qc metrics for idat files
+sesame_qc <- methylation_raw %>%
   map(sesameQC) %>%
   map_dfr( ~ as_tibble(.x)) %>%
   bind_cols(ID = targets$Sample_Name, .)
 
-methylation_betas <-
-  targets$file_path_prefix %>%
+#Run openSesame pipeline to get beta values
+methylation_betas <- targets$file_path_prefix %>%
   openSesame()
 
+#Get all the probes
 probenames <- rownames(methylation_betas)
 
-methylation_betas <-
-  methylation_betas %>% 
+#Convert betas to table and get sample names correct
+methylation_betas <- methylation_betas %>% 
   as.data.table %>%
   set_names(., targets$Sample_Name %>% paste0("Sample", .))
 
+#Doing correction to get M-values
 eps <- 1e-6
 methylation_mvals <- copy(methylation_betas)
 methylation_mvals <-
@@ -106,7 +110,7 @@ methylation_mvals <-
   .[, (names(.)) := lapply(.SD, function(x) { log( (x + eps) / ( 1 - x + eps) ) } )]
 
 
-dir.create("Output")
+# dir.create("Output")
 dir.create(paste0("Output/", date_export, "_MethylationDat"))
 
 fwrite(

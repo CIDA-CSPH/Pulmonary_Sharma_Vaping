@@ -2,8 +2,8 @@ library(sesameData)
 library(tidyverse)
 library(data.table)
 
-methyl_betas <- fread("./Output/20210914_MethylationDat/betas.tsv")
-methyl_mvals <- fread("./Output/20210914_MethylationDat/mvals.tsv")
+methyl_betas <- fread("./Output/2022_07_27_MethylationDat/betas.tsv")
+methyl_mvals <- fread("./Output/2022_07_27_MethylationDat/mvals.tsv")
 
 # sesame betas sorted by probenames
 # the manifest sorted by chr -> position
@@ -52,22 +52,21 @@ pca_percent_exp <-
 
 
 pca_df <-
-  final_metadata %>%
+  metadata_joined %>%
   bind_cols(pca_results$x[ , 1:3] %>% as_tibble)
 
-ggplot(pca_df, aes(PC1, PC2, color = sex, shape = sex)) + #, color = sex, shape = sex)) +
+ggplot(pca_df, aes(PC1, PC2, color = sex_lab, shape = sex_lab)) + #, color = sex, shape = sex)) +
   geom_point(alpha = 0.75) +
   geom_text_repel(
-  aes(label = SID),
+  aes(label = new_id),
   color = "black", size = 2) +
-  scale_shape_manual(name = "Sex", values = palette_shape_sex, labels = c("Female", "Male")) +
-  scale_color_manual(name = "Sex", values = palette_color_sex, labels = c("Female", "Male")) +
+  # scale_shape_manual(name = "Sex", values = palette_shape_sex, labels = c("Female", "Male")) +
+  # scale_color_manual(name = "Sex", values = palette_color_sex, labels = c("Female", "Male")) +
   xlab(pca_percent_exp[1]) + ylab(pca_percent_exp[2]) +
   ggtitle("Methylation PCA") +
   theme_few() +
-  facet_grid(~ RecruitmentCenter) +
+  facet_grid(~ recruitment_center) +
   geom_blank()
-
 
 
 

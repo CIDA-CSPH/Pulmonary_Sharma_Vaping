@@ -36,6 +36,7 @@ vignettes/*.pdf
 *.csv
 *.txt
 *.dat
+*.tsv
 # Excel
 *.xls*
 # SAS
