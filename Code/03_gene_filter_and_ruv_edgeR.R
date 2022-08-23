@@ -39,8 +39,8 @@ filtered_gene_count <- filtered_gene_count[,-1]
 genes <- rownames(filtered_gene_count)
 
 #Load metadata
-id_relate <- read_tsv(file = here("DataRaw/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
-metadata_unjoined <- read_csv(file = here("DataProcessed/metadata_cleaning/table1_clean_data_2022_03_30.csv"))
+id_relate <- read_tsv(file = here("DataRaw/subject_ids/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
+metadata_unjoined <- read_csv(file = here("DataProcessed/metadata/table1_clean_data_2022_08_22.csv"))
 
 
 #Join metadata

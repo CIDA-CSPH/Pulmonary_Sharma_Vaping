@@ -40,11 +40,18 @@ vape_dat_clean %>%
   filter(gender==5) %>% 
   select(gender,gender_txt)
 
+################## CODED SEX WRONG. ERROR CAUGHT ON 08/22/22 ##################
+# #Fix 'Gender' -> 'Sex'
+# vape_dat_clean <- vape_dat_clean %>% 
+#   mutate(sex_lab = case_when(gender == 1 ~ 'Male',
+#                              gender == 2 ~ 'Female',
+#                              gender == 5 ~ 'Female')) #Cheyret used Methylation data to confirm non-binary indiv is Female
+
 #Fix 'Gender' -> 'Sex'
-vape_dat_clean <- vape_dat_clean %>% 
-  mutate(sex_lab = case_when(gender == 1 ~ 'Male',
-                             gender == 2 ~ 'Female',
-                             gender == 5 ~ 'Female')) #Cheyret used Methylation data to confirm non-binary indiv is Female
+vape_dat_clean <- vape_dat_clean %>%
+  mutate(sex_lab = case_when(gender == 1 ~ 'Female',
+                             gender == 2 ~ 'Male',
+                             gender == 5 ~ 'Female')) #Confirmed w/ methylation
 #Check Grade
 vape_dat_clean %>% 
   group_by(grade) %>% 
@@ -112,7 +119,6 @@ tab1_dat <- vape_dat_clean %>%
   select(sid, recruitment_center, age, sex_lab, grade_lab, latino_lab, ever_vape_lab, vape_30_lab, vape_6mo_lab, fev1, fvc, r5, x20, fev1_fvc)
 
 #output csv
-# write_csv(tab1_dat, here('DataProcessed/metadata_cleaning/table1_clean_data_yyyy_mm_dd.csv'))
+#write_csv(tab1_dat, here('DataProcessed/metadata/table1_clean_data_2022_08_22.csv'))
 
-#look for this message
 

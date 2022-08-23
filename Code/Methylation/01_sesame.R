@@ -2,9 +2,11 @@
 library(tidyverse)
 library(here)
 library(kableExtra)
-library(sesame)
+library(sesame) #ver 1.15.6
 library(readxl)
 library(parallel)
+library(randomForest)
+library(janitor)
 
 kablize <- function(tab, digits = 3) {
   kable(tab,digits = digits, booktabs = T) %>% 
@@ -23,6 +25,10 @@ samplesheet <- left_join(
       mutate(`Sample Name` = as.numeric(`Sample Name`)),
     by = c("Sample_Name" = "Sample Name"))
 
+samplesheet <- samplesheet %>% 
+  mutate(sample_join = paste0("Sample", str_pad(as.character(Sample_Name), 2, pad = "0")),
+         sentrix_name = paste0(`Sentrix Barcode`, "_", `Sentrix Position`))
+
 # Getting Filename prefixes for readIDATpairs
 folder_raw_dat <- here("DataRaw/methylation/RawIdat/")
 
@@ -37,66 +43,95 @@ targets <- tibble(file_path =
            paste0(folder_raw_dat, .)) %>%
   filter(!duplicated(file_path_prefix))
 
-#Load EPIC Array
-sesameDataCache("EPIC")
+#Load EPIC Array (only need to do this the first time)
+#sesameDataCache()
 
-################## Read in IDAT data #################
-methylation_raw <- mclapply(searchIDATprefixes(folder_raw_dat), 
-                                          readIDATpair, 
-                                          mc.cores = 2)
+#################################### SeSAMe Pipeline By Hand (FINICKY B/C Parallelization!!!!)#######################################
+# ################## Read in IDAT data #################
+methylation_raw <- lapply(searchIDATprefixes(folder_raw_dat),
+                                          readIDATpair)
+# 
+# ################## Get Metrics  #################
+# # methylation_qc <- do.call(rbind, mclapply(methylation_raw, function(x) 
+# #                             as_tibble(sesameQC_calcStats(x)))) %>% 
+# #   bind_cols(Sample_ID = targets$Sample_Name, .)
+# # 
+# # rownames(methylation_qc) <- NULL
+# 
+# ################## Find Outliers  #################
+# # outlier_quant <- quantile(methylation_qc$mean_intensity, probs = c(0.01, 0.99))
+# # 
+# # methylation_qc <- methylation_qc %>% 
+# #   mutate(outlier = if_else(mean_intensity < outlier_quant[1], T, F))
+# 
+# #write_csv(methylation_qc, here("DataProcessed/methylation/methylation_qc_metrics.csv"))
+# ################## Plot Outliers  #################
+# 
+# # methylation_qc %>% 
+# #   ggplot(aes(y = log2(mean_intensity), labels = Sample_ID)) +
+# #   geom_boxplot()+
+# #   ylab("log2(Mean Intensity)")+
+# #   theme(axis.title.x=element_blank(),
+# #         axis.text.x=element_blank(),
+# #         axis.ticks.x=element_blank())
+# # 
+# # methylation_qc$Sample_ID[methylation_qc$outlier==T]
+# # 
+# # methylation_qc$mean_intensity[methylation_qc$outlier == T]  
+# 
+# ################## Dye-Bias Correction Visualization ##############
+# par(mfrow=c(2,3))
+# sesameQC_plotRedGrnQQ(methylation_raw$`205310770060_R01C01`, main = "R01C01 Before")
+# sesameQC_plotRedGrnQQ(methylation_raw$`205310770060_R02C01`, main = "R02C01 Before")
+# sesameQC_plotRedGrnQQ(methylation_raw$`205310760169_R03C01`, main = "R03C01 Before")
+# sesameQC_plotRedGrnQQ(dyeBiasNL(methylation_raw$`205310770060_R01C01`), main = "R01C01 After")
+# sesameQC_plotRedGrnQQ(dyeBiasNL(methylation_raw$`205003700122_R02C01`), main = "R02C01 After")
+# sesameQC_plotRedGrnQQ(dyeBiasNL(methylation_raw$`205310760169_R03C01`), main = "R03C01 After")
+# 
+# ############### Background Subtraction ########################
+# par(mfrow=c(2,1), mar=c(3,3,2,1))
+# sesameQC_plotBetaByDesign(methylation_raw$`205310770060_R01C01`, main="R01C01 Before", xlab="\beta")
+# sesameQC_plotBetaByDesign(noob(methylation_raw$`205310770060_R01C01`), main="R01C01 After", xlab="\beta")
+# 
+# ################## Run openSesame pipeline step-by-step #################
+# #qualityMask
+# methylation_mask <- BiocParallel::bplapply(methylation_raw, qualityMask)
+# #Infer Infinium I Channel
+# methylation_infer <- BiocParallel::bplapply(methylation_raw, inferInfiniumIChannel)
+# #Dye-Bias Correction
+# methylation_db_corr <- BiocParallel::bplapply(methylation_infer, dyeBiasNL)
+# #detection p-value masking
+# methylation_detect_mask <- BiocParallel::bplapply(methylation_db_corr, pOOBAH)
+# #Background subtraction
+# methylation_background <- BiocParallel::bplapply(methylation_detect_mask, noob)
+# #getBetas
+# betas <- do.call(cbind, BiocParallel::bplapply(methylation_background, getBetas))
+# 
+# betas <- openSesame(searchIDATprefixes(folder_raw_dat), BPPARAM = BiocParallel::MulticoreParam(2))
+# 
+# betas <- betas %>% 
+#   data.frame %>% 
+#   mutate(CpG_Site = rownames(.)) %>% 
+#   select(CpG_Site, everything())
 
-################## Get Metrics  #################
-methylation_qc <- do.call(rbind, lapply(methylation_raw, function(x)
-  as_tibble(sesameQC_calcStats(x)))) %>% 
-  bind_cols(Sample_ID = targets$Sample_Name, .)
+################# Check Probe Matching #####################
+par(mfrow=c(2,1), mar=c(3,3,2,1))
+sesameQC_plotBetaByDesign(methylation_raw$`205310770060_R01C01`, main="Before", xlab="\beta")
+sesameQC_plotBetaByDesign(matchDesign(methylation_raw$`205310770060_R01C01`), main="After", xlab="\beta")
 
-rownames(methylation_qc) <- NULL
+################# Write out Betas #####################
 
-################## Find Outliers  #################
-outlier_quant <- quantile(methylation_qc$mean_intensity, probs = c(0.01, 0.99))
+#write_tsv(betas, file = here("DataProcessed/methylation/methylation_betas.txt"))
 
-methylation_qc <- methylation_qc %>% 
-  mutate(outlier = if_else(mean_intensity < outlier_quant[1], T, F))
+#fwrite(betas, file = here("DataProcessed/methylation/methylation_betas_full.txt"))
 
-################## Plot Outliers  #################
 
-methylation_qc %>% 
-  ggplot(aes(y = log2(mean_intensity), labels = Sample_ID)) +
-  geom_boxplot()+
-  ylab("log2(Mean Intensity)")+
-  theme(axis.title.x=element_blank(),
-        axis.text.x=element_blank(),
-        axis.ticks.x=element_blank())
+############## Convert to M Values #####################
+mvals <- betas %>% 
+  select(-CpG_Site) %>% 
+  apply(., 2, BetaValueToMValue) %>% 
+  as.data.frame() %>% 
+  mutate(CpG_Site = rownames(.)) %>% 
+  select(CpG_Site, everything())
 
-methylation_qc$Sample_ID[methylation_qc$outlier==T]
-
-methylation_qc$mean_intensity[methylation_qc$outlier == T]  
-
-################## Run openSesame pipeline step-by-step #################
-#qualityMask
-methylation_mask <- BiocParallel::bplapply(methylation_raw, qualityMask)
-#Infer Infinium I Channel
-methylation_infer <- BiocParallel::bplapply(methylation_mask, inferInfiniumIChannel)
-#Dye-Bias Correction
-methylation_db_corr <- BiocParallel::bplapply(methylation_infer, dyeBiasNL)
-#detection p-value masking
-methylation_detect_mask <- BiocParallel::bplapply(methylation_db_corr, pOOBAH)
-#Background subtraction
-methylation_background <- BiocParallel::bplapply(methylation_detect_mask, noob)
-#getBetas
-betas <- do.call(cbind, BiocParallel::bplapply(methylation_background, getBetas))
-
-################## Compare to OpenSesame #################
-betas_test <- openSesame(folder_raw_dat, BPPARAM = BiocParallel::MulticoreParam(2))
-#Already ran the above line. Results match exactly. 
-
-################## Dye-Bias Correction Visualization ##############
-
-sesamePlotRedGrnQQ(methylation_raw$`205310770060_R01C01`)
-sesamePlotRedGrnQQ(methylation_db_corr$`205310770060_R01C01`)
-
-par(mfrow=c(1,2))
-sesamePlotRedGrnQQ(dyeBiasCorr(methylation_raw$`205310770060_R01C01`)) # linear correction
-sesamePlotRedGrnQQ(dyeBiasNL(methylation_raw$`205310770060_R01C01`))   # nonlinear correction
-
-############### Infinium Matching #######################
+#fwrite(mvals, here("DataProcessed/methylation/methylation_mvals.txt"))
