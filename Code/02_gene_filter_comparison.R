@@ -4,7 +4,7 @@ library(kableExtra)
 
 
 #read in raw gene counts
-raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
+raw_gene_count <- read_tsv(file = here("DataRaw/RNA_Seq/gene_counts_choo.txt"), col_names = T)
 
 #table to store results
 gene_filter_tib <- tibble(Filter = c(1,2,3),

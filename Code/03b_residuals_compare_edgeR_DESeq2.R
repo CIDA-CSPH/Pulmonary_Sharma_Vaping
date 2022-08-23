@@ -10,9 +10,9 @@ library(reshape2)
 
 #get residuals from edgeR Method
 
-edgeR_Resid <- read_csv(here("DataProcessed/first_pass_residuals_edgeR.csv"))
+edgeR_Resid <- read_csv(here("DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR.csv"))
 
-DESeq_Resid <- read_csv(here("DataProcessed/first_pass_residuals_DESeq2.csv"))
+DESeq_Resid <- read_csv(here("DataProcessed/rna_seq/ruv/first_pass_residuals_DESeq2.csv"))
 
 colnames(edgeR_Resid) <- colnames(DESeq_Resid)
 

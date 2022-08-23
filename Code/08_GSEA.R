@@ -17,7 +17,7 @@ format_num <- function(number, digits = 0, format = "f") {
   formatC(number, digits = digits, format = format, big.mark = ",")
 }
 ################## Read in results #################
-vape_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
+vape_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
 
 #Fix Ensemble ID's  and join with symbols
 vape_res$ensg <- gsub("\\..*", "", vape_res$ensg)
@@ -46,11 +46,11 @@ ranks_entrez <- vape_res$rank
 names(ranks_entrez) <- vape_res$ENTREZID
 
 ############################### KEGG ###########################################
-#get_kegg("hsa", path = here("DataRaw/pathways"))
+#get_kegg("hsa", path = here("DataRaw/enrichment"))
 
-ncbi_to_kegg <- read_tsv(here("DataRaw/pathways/ncbi_to_kegg2022-06-20Release_102.0+_06-20_Jun_22.txt"), col_names = F)
-kegg_to_path <- read_tsv(here("DataRaw/pathways/kegg_to_pathway2022-06-20Release_102.0+_06-20_Jun_22.txt"), col_names = F)
-path_to_name <- read_tsv(here("DataRaw/pathways/pathway_to_species2022-06-20Release_102.0+_06-20_Jun_22.txt"), col_names = F)
+ncbi_to_kegg <- read_tsv("DataRaw/enrichment/ncbi_to_kegg2022-06-20Release_102.0+_06-20_Jun_22.txt")
+kegg_to_pathway <- read_tsv("DataRaw/enrichment/kegg_to_pathway2022-06-15Release_102.0+_06-15_Jun_22.txt")
+pathway_to_species <- read_tsv("DataRaw/enrichment/pathway_to_species2022-06-15Release_102.0+_06-15_Jun_22.txt")
 
 #set column names
 colnames(ncbi_to_kegg) <- c("ncbi", "kegg")
@@ -92,7 +92,7 @@ react_path <- reactomePathways(names(ranks_entrez))
 ############################# Gene Ontology ####################################
 #hsa_ensembl <- useMart("ensembl",dataset="hsapiens_gene_ensembl")
 
-go_key <- read_rds(here("DataRaw/pathways/go_mart_2022_06_20.rds"))
+go_key <- read_rds(here("DataRaw/enrichment/go_mart_2022_06_20.rds"))
 
 
 # go_key <- getBM(attributes = c("ensembl_gene_id", "entrezgene_id", "external_gene_name",

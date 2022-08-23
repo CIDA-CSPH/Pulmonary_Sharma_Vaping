@@ -76,8 +76,8 @@ To assess the difference in the models, the results will focus on genes with rel
 The top 100 genes determined by FDR were subset from Model A to compare to Model P. This comparison shows that the top 100 genes in Model A are identical to the top 100 genes in Model P. 
 ```{r fig.width=12}
 #############Read in results###################
-modA_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
-modB_res <- read_csv(here("DataProcessed/de_pueblo_sensitivity/vape_res_pblo_2022_06_13.csv"))
+modA_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
+modB_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/pueblo_sensitivity/vape_res_pblo_2022_06_13.csv"))
 
 #############Join results and get top 100 genes###################
 AB_res <- left_join(modA_res, modB_res, by = c("ensg", "gene_name", "gene_type"), suffix = c(".modA", ".modB"))

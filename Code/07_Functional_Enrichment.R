@@ -5,7 +5,7 @@ library(diffEnrich)
 library(clusterProfiler)
 
 ################## Collect and store pathways from KEGG ###################
-kegg_hsa <- get_kegg('hsa', path = here("DataRaw/pathways"))
+kegg_hsa <- get_kegg('hsa', path = here("DataRaw/enrichment"))
 
 # ncbi_to_kegg <- read_tsv("DataRaw/pathways/ncbi_to_kegg2022-06-15Release_102.0+_06-15_Jun_22.txt")
 # kegg_to_pathway <- read_tsv("DataRaw/pathways/kegg_to_pathway2022-06-15Release_102.0+_06-15_Jun_22.txt")
@@ -18,7 +18,7 @@ kegg_hsa <- get_kegg('hsa', path = here("DataRaw/pathways"))
 ################## Get Gene List and map to Entrez ID ####################
 ##### FULL LIST
 #Read it in
-vape_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
+vape_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
 
 #Fix Ensemble ID's 
 vape_res$ensg <- gsub("\\..*", "", vape_res$ensg)

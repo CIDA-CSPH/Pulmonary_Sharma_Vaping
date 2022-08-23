@@ -11,7 +11,7 @@ library(rstatix)
 ###############################################################################################
 ##GET P-Value Histograms
 #read in raw gene counts
-raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
+raw_gene_count <- read_tsv(file = here("DataRaw/RNA_Seq/gene_counts_choo.txt"), col_names = T)
 
 #remove all genes with 0 counts in 75% or more of samples
 filter_0_.75_count <- raw_gene_count %>% 
@@ -40,7 +40,7 @@ genes <- rownames(filtered_gene_count)
 
 #Load metadata
 id_relate <- read_tsv(file = here("DataRaw/subject_ids/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
-metadata_unjoined <- read_csv(file = here("DataProcessed/metadata/table1_clean_data_2022_08_22.csv"))
+metadata_unjoined <- read_csv(file = here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
 
 
 #Join metadata
@@ -60,7 +60,7 @@ filtered_gene_count <- filtered_gene_count[,metadata_joined$new_id]
 ###############################################################################################
 #Test for Correlation between all variables of Interest########################################
 #Load variables 
-tab1_dat <- read_csv(file = here("DataProcessed/metadata/table1_clean_data_2022_08_22.csv"))
+tab1_dat <- read_csv(file = here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
 
 #Subset to only variables of interest
 vars_of_interest <- tab1_dat %>% 

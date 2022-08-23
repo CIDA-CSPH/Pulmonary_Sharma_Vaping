@@ -10,7 +10,7 @@ library(WGCNA)
 library(Hmisc)
 
 #read in raw gene counts
-raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
+raw_gene_count <- read_tsv(file = here("DataRaw/RNA_Seq/gene_counts_choo.txt"), col_names = T)
 
 
 #remove all genes with 0 counts in 75% or more of samples
@@ -40,7 +40,7 @@ genes <- rownames(filtered_gene_count)
 
 #Load metadata
 id_relate <- read_tsv(file = here("DataRaw/subject_ids/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
-metadata_unjoined <- read_csv(file = here("DataProcessed/metadata/table1_clean_data_2022_08_22.csv"))
+metadata_unjoined <- read_csv(file = here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
 
 
 #Join metadata
@@ -144,7 +144,7 @@ first_pass_residuls <- residuals(first_pass, type="deviance")
 first_pass_residuls_no12 <- residuals(first_pass_no12, type="deviance")
 
 #output the firt pass residuals for comparison with DESeq2
-#write_csv(as.data.frame(first_pass_residuls), file = here("DataProcessed/first_pass_residuals_edgeR.csv"))
+#write_csv(as.data.frame(first_pass_residuls), file = here("Sharma_Vaping/DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR.csv"))
 
 #Elbow Method for finding the optimal number of clusters
 set.seed(404)

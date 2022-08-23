@@ -7,7 +7,7 @@ library(here)
 library(forcats)
 
 #read in data
-all_metadata <- readr::read_csv(here::here("choo_code_archive/AdolescentVapingRNASeq/Data/20210325/all_data_Latino_Youth_survey_clean_pulmfxn_FINAL_3.23.21.csv"))
+all_metadata <- readr::read_csv(here("DataRaw/clinical_metadata/all_data_Latino_Youth_survey_clean_pulmfxn_FINAL_3.23.21.csv"))
 
 head(all_metadata)
 glimpse(all_metadata)
@@ -119,6 +119,6 @@ tab1_dat <- vape_dat_clean %>%
   select(sid, recruitment_center, age, sex_lab, grade_lab, latino_lab, ever_vape_lab, vape_30_lab, vape_6mo_lab, fev1, fvc, r5, x20, fev1_fvc)
 
 #output csv
-#write_csv(tab1_dat, here('DataProcessed/metadata/table1_clean_data_2022_08_22.csv'))
+#write_csv(tab1_dat, here('DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv'))
 
 

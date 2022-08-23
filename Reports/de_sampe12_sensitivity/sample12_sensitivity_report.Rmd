@@ -81,8 +81,8 @@ The top 100 genes determined by the FDR-adjusted p-value were subset from Model 
 
 ```{r fig.width=12}
 #############Read in results###################
-modA_res <- read_csv(here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
-modB_res <- read_csv(here("DataProcessed/de_sample12_sensitivity/Vape_Results_no12_2022_05_11.csv"))
+modA_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
+modB_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/sample12_sensitivity/Vape_Results_no12_2022_05_11.csv"))
 
 #############Join results and get top 100 genes###################
 AB_res <- left_join(modA_res, modB_res, by = c("ensg", "gene_name", "gene_type"), suffix = c(".modA", ".modB"))
@@ -318,10 +318,10 @@ Excluding sample 12 from the model additionally inflates p-values. P-values are 
 ### Figure 6: Boxplots of Top Genes (RUVr-Normalized Counts)
 
 ```{r fig.height=6, fig.width=8}
-full_ruv_tidy <- read_csv(here("DataProcessed/de_full/top4_vape_ruv_normcounts_2022_06_14.csv")) 
+full_ruv_tidy <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/top4_vape_ruv_normcounts_2022_06_14.csv")) 
 full_ruv_tidy <- full_ruv_tidy %>% 
   dplyr::mutate(vape_6mo_lab = factor(vape_6mo_lab, levels = c("not_vaped", "vaped"), labels = c( "Not Vaped", "Vaped")))
-ruv_tidy_no12 <- read_csv(here("DataProcessed/de_sample12_sensitivity/RUV_Vape_Results_no12_2022_06_14.csv"))
+ruv_tidy_no12 <- read_csv(here("DataProcessed/rna_seq/differential_expression/sample12_sensitivity/RUV_Vape_Results_no12_2022_06_14.csv"))
 
 ruv_tidy_no12 <- ruv_tidy_no12 %>% 
   filter(ruv_tidy_no12$gene %in% full_ruv_tidy$gene)

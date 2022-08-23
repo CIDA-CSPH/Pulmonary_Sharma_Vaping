@@ -8,11 +8,11 @@ library(RColorBrewer)
 library(kableExtra)
 
 ######################### Read in files so that they are unaltered and join ###############################
-filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/genetic/filtered_gene_count_2022_05_04.csv")))
-metadata_joined <- as.data.frame(read_csv(here("DataProcessed/metadata/metadata_joined_2022_04_20.csv")))
-ruv_factor_dat <- read_csv(here("DataProcessed/ruv/ruv_factor_data_k2_2022_04_20.csv"))
-ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
-gene_annotations <- read_tsv(here("DataRaw/gene_annotation/gencode_annotations.txt"))
+filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_05_04.csv")))
+metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/metadata_joined_rnaseq_04_20_2022.csv")))
+ruv_factor_dat <- read_csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_04_20.csv"))
+ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
+gene_annotations <- read_tsv(here("DataRaw/RNA_Seq/gencode_annotations_choo.txt"))
 
 #fix rownames of filtered gene count and ruv_counts
 rownames(filtered_gene_count) <- filtered_gene_count$Feature

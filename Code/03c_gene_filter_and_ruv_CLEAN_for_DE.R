@@ -37,8 +37,8 @@ filtered_gene_count <- filtered_gene_count[,-1]
 genes <- rownames(filtered_gene_count)
 
 #Load metadata
-id_relate <- read_tsv(file = here("DataRaw/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
-metadata_unjoined <- read_csv(file = here("DataProcessed/metadata_cleaning/table1_clean_data_2022_03_30.csv"))
+id_relate <- read_tsv(file = here("DataRaw/subject_ids/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
+metadata_unjoined <- read_csv(file = here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
 
 
 #Join metadata
@@ -59,7 +59,7 @@ filtered_gene_count_write <- filtered_gene_count %>%
   dplyr::mutate(Feature = base::rownames(filtered_gene_count)) %>% 
   dplyr::select(Feature, everything())
 
-write_csv(filtered_gene_count_write, file = here("DataProcessed/filtered_gene_count_2022_05_04.csv"))
+#write_csv(filtered_gene_count_write, file = here("DataProcessed/filtered_gene_count_2022_05_04.csv"))
 
 ##Prepare for DESeq2
 #Set up factors properly
@@ -90,7 +90,7 @@ ruv_prep <- newSeqExpressionSet(as.matrix(filtered_gene_count),
 
 
 #Read in residuals matrix (See "03_gene_filter_and_ruv_edgeR.R" for more information on calculation)
-first_pass_residuls <- as.matrix(read_csv(here("DataProcessed/first_pass_residuals_edgeR.csv")))
+first_pass_residuls <- as.matrix(read_csv(here("DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR.csv")))
 rownames(first_pass_residuls) <- genes
 colnames(first_pass_residuls) <- metadata_joined$new_id
 
@@ -102,10 +102,10 @@ ruv_k2_norm_counts <- as.data.frame(normCounts(ruv_k2)) %>%
   mutate(gene = rownames(.)) %>% 
   select(gene, everything())
 
-# write_csv(ruv_k2_norm_counts, file = here("DataProcessed/RUV_k2_norm_counts_2022_05_06.csv"))
+# write_csv(ruv_k2_norm_counts, file = here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_05_06.csv"))
 
 ruv_k2_write <- pData(ruv_k2) %>% 
   mutate(new_id = rownames(.)) %>% 
   select(new_id, everything())
 
-#write_csv(ruv_k2_write, file = "DataProcessed/ruv_factor_data_k2_2022_04_20.csv")
+#write_csv(ruv_k2_write, file = "DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_04_20.csv")
