@@ -145,7 +145,7 @@ Figure 2 shows the expected outcome of background noise subtraction. Beta values
 
 Overall, $\beta$ and M-values followed their expected distributions.
 
-### Figure 3
+### Figure 3: $\beta$ and M-Value Distributions
 
 ![](beta_m_distribution_2022_08_19.jpeg)
 
@@ -155,7 +155,7 @@ Figure 3 indicates some noise around $\beta$ = 0.5 or $M = 0$. This noise could 
 
 Visualization of the samples by median X and Y chromosome intensities helps to identify samples with poor quality or samples whose clinical sex do not match predicted sex based on these values. Figure 4 displays plots of median intensity for X and Y chromosomes color-coded for both clinical and predicted sex.
 
-### Figure 4
+### Figure 4: Sex Verification
 
 ```{r fig.height= 5, fig.width=10, message=F, error=F, warning=F}
 metadata_sex <- read_csv(here("DataProcessed/methylation/metadata_all_sex_2022_08_22.csv"))
@@ -188,9 +188,19 @@ ggarrange(clin_sex_plot, predicted_sex_plot, nrow = 1, ncol = 2, common.legend =
 
 Figure 4 demonstrates sample clustering by sex for median X and Y intensities. Clinical sex matches predicted sex for all samples. It should be noted that Sample 16 recorded 'non-binary' as clinical sex, and sex was inferred by methylation data for other portions of this project.
 
-## Clustering by Batch
+## Sample Clustering
 
-## Clustering by Recruitment Center
+MDS plots were made using the package `minfi` ver. `r package.version("minfi")` for both raw data and data pre-processed using dye-bias correction and background subtraction provided by the function `preprocessNoob`.
+
+### Figure 5: Sample Clustering (Raw Data)
+![](MDS_Raw_Plots_2.jpeg)
+
+In raw plots, sample clustering can be seen by sex, but no clustering is seen by vape status or recruitment center. 
+
+### Figure 6: Sample Clustering (Noob Data)
+![](MDS_NOOB_Plots.jpeg)
+
+Data processed using bye-bias correction and background subtraction show similar results to the raw data. Samples cluster only by sex. 
 
 # Conclusions
 Overall, $\beta$- and M-values follow their expected distributions. A more stringent cutoff for detection p-value (e.g. <0.01) may help to decrease noise. Sample 17 falls in the 1st percentile for mean signal intensity and should be noted for future analyses. Visualizations are still needed to assess sample clustering due to technical effects, sex, and recruitment center. 

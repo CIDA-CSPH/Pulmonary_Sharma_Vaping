@@ -1,13 +1,10 @@
 ####################Load Libraries########################
 library(tidyverse)
 library(here)
-library(kableExtra)
 library(minfi)
 library(readxl)
-library(parallel)
-library(randomForest)
-library(janitor)
-
+library(bumphunter)
+library(RColorBrewer)
 
 #################### Set Base Directory ########################
 
@@ -17,7 +14,7 @@ list.files(baseDir)
 
 #################### Read in Sample Data ########################
 ################## Setup #################
-#Read in and join metadata
+#Read in and join methyl metadata
 samplesheet <- left_join(
   read_csv(here("DataRaw/methylation/Metadata/SSharma_48_samplesheet_05202021.csv"), skip = 7) %>%
     select(-`Sample_Group`, -`Pool_ID`),
@@ -46,8 +43,105 @@ targets <- tibble(file_path =
 targets <- targets %>% 
   dplyr::rename(Basename = file_path_prefix)
 
+#Read in clinical metadata
+id_relate <- read_tsv(here("DataRaw/methylation/20210401_methylation_coreID_to_PID.txt"))
+clin_metadata <- read_csv(here("DataProcessed/metadata/table1_clean_data_2022_08_22.csv"))%>% 
+  filter(sid %in% id_relate$SID) %>% 
+  mutate(vape_6mo_lab = factor(vape_6mo_lab, levels = c("Did Not Vape in Last 6 Months", "Vaped in Last 6 Months"), 
+                               labels = c("No Vape", "Vape")))
+
+#join sample id to subject id
+clin_metadata_join <- left_join(id_relate, clin_metadata, by = c("SID" = "sid"))
+
+#join metadata back to targets
+targets <- left_join(targets, clin_metadata_join %>% 
+                       select(NewID,SID,sex_lab, age, recruitment_center, vape_6mo_lab),
+                     by = c("Sample_Name" = "NewID")) 
 #################### Read in Sample Data ########################
 
 RGset <- read.metharray.exp(targets = targets)
 
-mdsPlot(RGset, sampNames = RGset$Sample_Name)
+getManifest(RGset)
+
+#################### Plotting and QC ########################
+#Beta Density Plots
+densityPlot(RGset, sampGroups = targets$sex_lab, main = "Beta", xlab = "Beta")
+densityPlot(RGset, sampGroups = targets$vape_6mo_lab, main = "Beta", xlab = "Beta")
+densityBeanPlot(RGset, sampGroups = targets$sex_lab, sampNames = targets$sample_join)
+densityBeanPlot(RGset, sampGroups = targets$vape_6mo_lab, sampNames = targets$sample_join)
+
+##Control Plots
+#Negative Controls
+controlStripPlot(RGset, controls = c("NEGATIVE"), sampNames = targets$Sample_Name)
+#Bisulfite Conversion Controls
+controlStripPlot(RGset, controls = c("BISULFITE CONVERSION I"), sampNames = targets$Sample_Name)
+
+################ Detection P-Values ##########################
+detP <- detectionP(RGset)
+failed <- detP > 0.05
+numfail.col = colMeans(failed)
+which.max(numfail.col)
+badProbes <- rowMeans(detP) >= 0.05
+sum(badProbes)
+
+################ Normalization and MDS Plots ##################
+mset = preprocessRaw(RGset)
+set.seed(404)
+msetNoob <- preprocessNoob(RGset)
+
+num_1000 <- 1000
+num_10000 <- 10000
+sex_pal <- c("deepskyblue", "deeppink3")
+center_colors <- c("cyan3", "chartreuse3", "darkorange")
+
+#Raw data
+par(mfrow = c(2,3))
+mdsPlot(mset, sampGroups = targets$sex_lab, sampNames = targets$Sample_Name,
+        numPositions=num_1000, ylim = c(-10,10), main = "MDS - Raw data - Sex -
+ 1000 sites", pal = sex_pal)
+
+mdsPlot(mset, sampGroups = targets$vape_6mo_lab, sampNames = targets$Sample_Name,
+        numPositions=num_1000, ylim = c(-10,10), main = "MDS - Raw data - Vape Status -
+ 1000 sites")
+
+mdsPlot(mset, sampGroups = targets$recruitment_center, sampNames = targets$Sample_Name,
+        numPositions=num_1000, ylim = c(-10,10), pal = center_colors, main = "MDS - Raw data - Recruitment Center -
+ 1000 sites")
+
+mdsPlot(mset, sampGroups = targets$sex_lab, sampNames = targets$Sample_Name,
+        numPositions=num_10000, ylim = c(-10,10), main = "MDS - Raw Data - Sex -
+ 10000 sites", pal = sex_pal)
+
+mdsPlot(mset, sampGroups = targets$vape_6mo_lab, sampNames = targets$Sample_Name,
+        numPositions=num_10000, ylim = c(-10,10), main = "MDS - Raw Data - Vape Status -
+ 10000 sites")
+
+mdsPlot(mset, sampGroups = targets$recruitment_center, sampNames = targets$Sample_Name,
+        numPositions=num_10000, ylim = c(-10,10), pal = center_colors, main = "MDS - Raw data - Recruitment Center -
+ 10000 sites")
+
+#Noob data
+par(mfrow = c(2,3))
+mdsPlot(msetNoob, sampGroups = targets$sex_lab, sampNames = targets$Sample_Name,
+        numPositions=num_1000, ylim = c(-10,10), main = "MDS - Noob - Sex -
+ 1000 sites", pal = sex_pal)
+
+mdsPlot(msetNoob, sampGroups = targets$vape_6mo_lab, sampNames = targets$Sample_Name,
+        numPositions=num_1000, ylim = c(-10,10), main = "MDS - Noob - Vape Status -
+ 1000 sites")
+
+mdsPlot(msetNoob, sampGroups = targets$recruitment_center, sampNames = targets$Sample_Name,
+        numPositions=num_1000, ylim = c(-10,10), pal = center_colors, main = "MDS - Noob - Recruitment Center -
+ 1000 sites")
+
+mdsPlot(msetNoob, sampGroups = targets$sex_lab, sampNames = targets$Sample_Name,
+        numPositions=num_10000, ylim = c(-10,10), main = "MDS - Noob - Sex -
+ 10000 sites", pal = sex_pal)
+
+mdsPlot(msetNoob, sampGroups = targets$vape_6mo_lab, sampNames = targets$Sample_Name,
+        numPositions=num_10000, ylim = c(-10,10), main = "MDS - Noob - Vape Status -
+ 10000 sites")
+
+mdsPlot(msetNoob, sampGroups = targets$recruitment_center, sampNames = targets$Sample_Name,
+        numPositions=num_10000, ylim = c(-10,10), pal = center_colors, main = "MDS - Noob - Recruitment Center -
+ 10000 sites")
