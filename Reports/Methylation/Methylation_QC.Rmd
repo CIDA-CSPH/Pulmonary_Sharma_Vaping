@@ -37,9 +37,15 @@ library(Biobase)
 library(here)
 library(readxl)
 library(ggpubr)
+library(minfi)
 
 format_num <- function(number, digits = 0, format = "f") {
   formatC(number, digits = digits, format = format, big.mark = ",")
+}
+
+kablize <- function(tab, digits = 3) {
+  kable(tab,digits = digits, booktabs = T) %>% 
+    kableExtra::kable_styling(latex_options = c("scale_down", "striped"), position = "center")
 }
 ```
 
@@ -57,58 +63,121 @@ Samples will be evaluated for a low mean-intensity to identify potential outlier
 
 ## Probe Masking
 
-The `SeSAMe` package uses probe 'masking' instead of probe removal. These terms are essentially interchangeable; however, it should be noted that 'masked' probes are not actually removed from the dataset. They are only ignored by `SeSAMe` when completing down-stream analyses. Probes are masked in two ways:
+The `SeSAMe` package uses probe 'masking' instead of probe removal. These terms are interchangeable; however, it should be noted that 'masked' probes are not actually removed from the dataset. They are only ignored by `SeSAMe` when completing down-stream analyses. Probes are masked in two ways:
 
 1.  [Experiment-independent Probe Masking]{.underline}: Probes that are masked due to non-unique mapping or influence by SNPs.
 2.  [Experiment-dependent Probe Masking]{.underline}: Probes that are masked based on the detection p-value, which represents the probability of a detection signal being background flourescence. Masks are based on the detection p-value, which represents the probability of a detection signal being background fluorescence [@zhou2018].
 
-Experiment-independent probe masking is set by a pre-determined list of probes specific to the 'EPIC' array. Experiment -dependent probe masking will be determined by p-value threshold. CpG probes with a detection p-value \> 0.05 will be masked for the purpose of this study.
+Experiment-independent probe masking is set by a pre-determined list of probes specific to the 'EPIC' array. Experiment -dependent probe masking will be determined by a p-value threshold. CpG probes with a detection p-value \> 0.05 in at least 10% of samples will be masked for the purpose of this study.
 
 ## Data Transformations
 
-There are two data transformations within the `openSesame` pipeline. The first is a dye bias correction. The `openSesame` pipeline defaults to a non-linear correction which ensures that Infinium-I Red and Grn probes have the same distribution of signal.
+There are two data transformations within the `sesame` pipeline. The first is a dye bias correction. Dye bias refers to bias in the methylation values due to the performance of the red and green dyes that create flourescence and are then interpreted as methylation values. There are several corrections that can be applied to make the red and green values more comparable. `sesame` specifically implements a non-linear dye bias correction.
 
-The next transformation within the `openSesame` pipeline is background subtraction. The default method is based normal-exponential deconvolution using out-of-band probes [@triche2013]. This transformation is accomplished using the function `noob` and separates true signal from background noise. Eliminating background noise helps to align beta values from Infinium I and II probes and achieve the expected bimodal distribution for each.
-
-This report will provide visualizations for both dye-bias correction and background subtraction to ensure the expected outcome.
+The next transformation within the `openSesame` pipeline is background subtraction. The purpose of background subtraction is to align the distribution of beta values for Infinium I and II probes in order to make them more comparable. The default method for `sesame` is a normal-exponential deconvolution using out-of-band probes or 'noob' [@triche2013].
 
 ## Beta and M-Value Distributions
 
-The product of the `SeSAMe` data pipeline is a matrix of beta values for each sample. Beta values will be converted to M-values using the logit transformation
+The product of the `SeSAMe` data pipeline is a matrix of beta values. Beta values will be converted to M-values using the logit transformation
 
 $$M = log_2(\frac{\beta}{1 - \beta})$$
 
-Visualizations will ensure the proper distribution of $\beta$ and m-values, respectively.
+Visualizations will ensure the proper distribution of $\beta$ and M-values, respectively.
 
 ## Sample Clustering
 
-Visualizations of clustering by sex, recruitment center, and batch will help to detect any technical effects that need to be accounted for in downstream analyses.
+Visualizations of clustering by sex, recruitment center, and vape status will help to detect any technical effects that need to be accounted for in downstream analyses.
 
 # Results
 
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
+#Read in Needed Files
+#betas
 betas <- read_tsv(here("DataProcessed/methylation/methylation_betas.txt"))
 
-betas <- drop_na(betas)
+#Mvals
+mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals.txt"))
 
-methylation_qc <- read_csv(here("DataProcessed/methylation/methylation_qc_metrics.csv"))
+#Autosomal betas
+betas_auto <- read_tsv(here('DataProcessed/methylation/autosomal_betas.txt'))
 
-probes_removed <- as.numeric(methylation_qc$num_probes_all[1] - dim(betas)[1])
+#clinical metadata with chromosomal intensity values
+metadata_sex <- read_csv(here("DataProcessed/methylation/metadata_all_sex_2022_08_30.csv"))
 
-badid <- methylation_qc[methylation_qc$outlier==T,]
+#Illumina QC Metrics
+methylation_qc <- read_csv(here("DataProcessed/methylation/methylation_qc_metrics.csv")) %>% 
+  left_join(., metadata_sex %>% select(rna_id, methylation_id, sid, sentrix_name, vape_6mo_lab), by = "sentrix_name")
 
-badid_label <- paste0("Sample ",as.character(methylation_qc$Sample_ID[methylation_qc$outlier==T]))
+```
+
+```{r}
+#Samples with no RNA or Meth
+no_rna_meth <- metadata_sex %>% 
+  filter(is.na(rna_id) & is.na(methylation_id)) %>% 
+  .[,"sid"] %>% as.list()
+#Samples with no Meth only
+no_meth <- metadata_sex %>% 
+  filter(!is.na(rna_id) & is.na(methylation_id)) %>% 
+  .[,"sid"] %>% as.character()
+#Sample without vape status
+no_vape_sid <- metadata_sex %>% 
+  filter(is.na(vape_6mo_lab)) %>% 
+  .[,"sid"] %>% as.character()
+#Sample without vape statu
+no_vape_sentrix <- metadata_sex %>% 
+  filter(is.na(vape_6mo_lab)) %>% 
+  .[,"sentrix_name"] %>% as.character()
+
+#Fix betas and mvals
+betas <- betas[,colnames(betas) != no_vape_sentrix]
+mvals <- mvals[,colnames(mvals) != no_vape_sentrix]
+betas_auto <- betas_auto[,colnames(betas_auto) != no_vape_sentrix]
+
+#Label column for plots 
+metadata_sex <- metadata_sex %>% 
+  mutate(vape_text = if_else(vape_6mo_lab == "Vaped in Last 6 Months", "Vaped", "Not Vaped"))
+```
+
+Of the 51 subjects surveyed for this project, methylation data were collected for 48. Two of the three subjects (SID `r no_rna_meth[[1]][1]` & `no_rna_meth[[1]][2]`) for whom there was no transcript data also had no methylation data. One sample (SID `r no_meth`) included in the RNASeq Analysis known as "Sample 12" also had missing methylation data. This sample was the center of a sensitivity analysis for inclusion in RNASeq analyse (see "sample12_sensitivity_report_2022_mm_dd.html"), and it should be noted that this subject will not be available for comparison. One sample (SID `r no_vape_sid`) lacked vape status in clinical metadata and was removed after obtaining beta values for all subjects in order to retain the benefits of that sample for normalization purposes. This sample was also excluded from the RNASeq analysis. Downstream analyses will include 47 samples.
+
+```{r}
+#Get all samples missing data
+no_dat_samps <- metadata_sex %>% 
+  filter(is.na(rna_id) | is.na(methylation_id)) %>% 
+  select(sid, rna_id, methylation_id) %>% 
+  rename(rna_id = "RNASeq ID",
+         methylation_id = "Methylation ID",
+         sid = "Subject ID")
+#set option
+options(knitr.kable.na = 'No Data')
+#make kable table
+no_dat_samps %>%
+  mutate(`RNASeq ID` = if_else(is.na(`RNASeq ID`), "No Data", `RNASeq ID`),
+         `Methylation ID` = if_else(is.na(`Methylation ID`), "No Data", `Methylation ID`))%>% 
+  kablize()
+
+#Filter out necessary samples from metadata
+metadata_sex <- metadata_sex %>% 
+  filter(!is.na(rna_id) , !is.na(methylation_id), !is.na(vape_6mo_lab))
 ```
 
 ## Outlier Samples
 
-`r as.character(badid_label)` falls in the bottom 1% of mean signal intensity readings. The boxplot below visualizes this relationship.
+```{r}
+low_qual_id <- as.character(methylation_qc[methylation_qc$outlier == T, "sid"])
+```
+
+`r low_qual_id` falls in the bottom 1% of mean signal intensity readings.
+
+### Figure 1: Sample Quality Outliers
 
 ```{r}
+
+## Plot Outliers ##
 methylation_qc %>% 
   ggplot(aes(y = log2(mean_intensity))) +
   geom_boxplot() +
-  geom_text(data = badid, aes(y = log2(mean_intensity), x = -0.06, label = badid_label), col = "red")+
+  geom_text(data = methylation_qc[methylation_qc$outlier == T, ], aes(y = log2(mean_intensity), x = -0.03, label = methylation_qc[methylation_qc$outlier == T, ]$sid), col = "red")+
   geom_hline(aes(yintercept = log2(quantile(methylation_qc$mean_intensity, probs = 0.01)), col = "1st Percentile"), linetype = "dashed") +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
@@ -119,95 +188,208 @@ methylation_qc %>%
        color = NULL)
 ```
 
-Considering the small sample size in this experiment, it is advisable *not* to remove `r badid_label`, but it is worth noting for downstream analyses.
+Considering the small sample size in this experiment, it is advisable *not* to remove `r low_qual_id`, but it is worth noting for downstream analyses.
 
 ## Probe Masking
 
-After expriment-independent and experiment-dependent (p-value detection) masking, there were `r format_num(dim(betas)[1])` CpG sites remaining for analysis. `r format_num(probes_removed)` were removed due to non-unique mapping, influence by SNPs, and high (\> 0.05) detection p-values.
+```{r}
+#non-experimental probes removed
+raw_idat_example <- readIDATpair(here("DataRaw/methylation/RawIdat/Slide_1_205310770060/205310770060_R01C01"))
+
+non_exp_probes_rm <- qualityMask(raw_idat_example)$mask %>%
+  sum() %>% as.numeric()
+
+#experimental probes removed
+exp_probes_rm <- as.numeric(length(raw_idat_example$Probe_ID)) - dim(betas)[1] - non_exp_probes_rm #total probes - probes kept - nonexp probes removed
+
+#total probes removed
+total_probe_rm <- non_exp_probes_rm + exp_probes_rm
+```
+
+`r format_num(non_exp_probes_rm)` CpG sites were removed by non-experimental probe masking and `r format_num(exp_probes_rm)` were removed by experimental probe masking (detection p-value \> 0.05 in $\ge$ 10% of samples). `r format_num(total_probe_rm)` probes were removed in total.
 
 ## Data Transformations
 
-There are several options within the `SeSAMe` package to perform dye-bias correction. The default, `dyeBiasNL`, accounts for the non-linear dependence of signal intensities in type I probes.
+Figure 2 demonstrates the non-linear dye bias correction for a small subset of samples.
 
-### Figure 1: Dye Bias Correction
+### Figure 2: Dye Bias Correction
 
-![](Dye_Bias_Plot_2022_08_18.jpeg)
+![](dye_bias_correction_2022_09_06.jpeg)
 
-Figure 1 demonstrates that the non-linear dye-bias correction worked as expected for three of the samples. Similar results are expected for the remaining samples.
+Overall, the correction worked as expected, but it should be noted that there is still a slight bias towards the green signal for higher-intensity values.
 
-### Figure 2: Sample Beta Value Distribution for Infinium I and II Probes
+Figure 3 demonstrates the 'noob' method of background subtraction for a single sample.
+
+### Figure 3: Sample Beta Value Distribution for Infinium I and II Probes
 
 ![](Backgroung_Subtraction_2022_08_18.jpeg)
 
-Figure 2 shows the expected outcome of background noise subtraction. Beta values for the given sample are shifted and have similar modes near 0 and 1.
+'noob' background subtraction shifted the distributions of probes to have modes closer to 0 and 1 (the expected distribution of beta values). Additionally, it appears that some noise was removed from the unmethylated beta values.
 
 ## Beta and M-Value Distributions
 
-Overall, $\beta$ and M-values followed their expected distributions.
+Overall, $\beta$ and M-values followed their expected distributions with peaks near 0 (unmethylated sites) and 1 (methylated sites) in the beta distribution. 
 
-### Figure 3: $\beta$ and M-Value Distributions
+### Figure 4: $\beta$ and M-Value Distributions
 
-![](beta_m_distribution_2022_08_19.jpeg)
+![](beta_mval_distribution_2022_09_02.jpeg)
 
-Figure 3 indicates some noise around $\beta$ = 0.5 or $M = 0$. This noise could indicate probes that were not removed by experiment-dependent probe masking. Noise may be reduced at a more stringent threshold for detection p-values (e.g. \< 0.01).
+Figure 4 indicates some noise around $\beta$ = 0.5 or $M$ = 0. This noise could indicate probes that were not removed by experiment-dependent probe masking. Noise may be reduced at a more stringent threshold for detection p-values (e.g. \< 0.01).
 
 ## Clustering by Sex
 
-Visualization of the samples by median X and Y chromosome intensities helps to identify samples with poor quality or samples whose clinical sex do not match predicted sex based on these values. Figure 4 displays plots of median intensity for X and Y chromosomes color-coded for both clinical and predicted sex.
+Visualization of the samples by median X and Y chromosome intensities helps to identify samples with poor quality or samples whose clinical sex do not match predicted sex based on these values. Figure 5 displays plots of median intensity for X and Y chromosomes color-coded for both clinical and predicted sex.
 
-### Figure 4: Sex Verification
+### Figure 5: Sex Verification
 
 ```{r fig.height= 5, fig.width=10, message=F, error=F, warning=F}
-metadata_sex <- read_csv(here("DataProcessed/methylation/metadata_all_sex_2022_08_22.csv"))
-
 #Clinical Sex
 clin_sex_plot <- metadata_sex %>% 
   ggplot(aes(x = log2(medianX), y = log2(medianY), col = sex_lab)) +
-  geom_text(aes(label = new_id)) +
-  labs(col = "Sex",
-       title = "Clinical",
-       x = "Log2(Median X Intensity)",
-       y = "Log2(Median Y Intensity)") +
+  geom_text(aes(label = sid)) +
+  labs(col = "Sex") +
   theme(legend.position = "bottom") +
   scale_color_manual(values = c("deepskyblue", "deeppink3"))
 
 #Predicted Sex
 predicted_sex_plot <- metadata_sex %>% 
   ggplot(aes(x = log2(medianX), y = log2(medianY), col = pred_sex)) +
-  geom_text(aes(label = new_id)) +
-  labs(col = "Sex",
-       title = "Predicted",
-       x = "Log2(Median X Intensity)",
-       y = "Log2(Median Y Intensity)") +
+  geom_text(aes(label = sid)) +
+  labs(col = "Predicted Sex") +
   theme(legend.position = "bottom")+
   scale_color_manual(values = c("deepskyblue", "deeppink3"))
 
 ggarrange(clin_sex_plot, predicted_sex_plot, nrow = 1, ncol = 2, common.legend = T)
-
 ```
 
-Figure 4 demonstrates sample clustering by sex for median X and Y intensities. Clinical sex matches predicted sex for all samples. It should be noted that Sample 16 recorded 'non-binary' as clinical sex, and sex was inferred by methylation data for other portions of this project.
+Figure 5 demonstrates sample clustering by sex for median X and Y intensities. Clinical sex matches predicted sex for all samples. It should be noted that SID 122 recorded 'non-binary' as clinical sex, and sex was inferred by methylation data for other portions of this project.
 
 ## Sample Clustering
 
-MDS plots were made using the package `minfi` ver. `r package.version("minfi")` for both raw data and data pre-processed using dye-bias correction and background subtraction provided by the function `preprocessNoob`.
+```{r}
+#convert cpgsites back to rownames
+mds_prep <- function(dat) {
+  dat <- as.data.frame(dat)
+  rownames(dat) <- dat[,"CpG_Site"]
+  new_dat <- dat %>% 
+    select(-CpG_Site) %>% 
+    as.matrix()
+  return(new_dat)
+}
 
-### Figure 5: Sample Clustering (Raw Data)
-![](MDS_Raw_Plots_2.jpeg)
+#Code to prep data and make mds plots
+make_mds_plots <- function(vals, meta, plot = c("sex", "vape", "center"), nump = 1000, lim = c(-10, 10), mlim = c(-50, 50)){
+  #Get only samples with methylation data and arrange in same order as betas so that you can use for mds plots
+  meta <- meta %>% 
+    filter(sentrix_name %in% colnames(vals)) %>% 
+    arrange(factor(sentrix_name, levels = colnames(vals)))
+  
+  #Prep values for mds plots
+  vals <- mds_prep(vals)
+  
+  #Get mvals
+  mvals <- BetaValueToMValue(vals)
+  
+  # Set Color Pallattes
+  sex_pal <- c("deepskyblue", "deeppink3")
+  center_colors <- c("cyan3", "chartreuse3", "darkorange")
+  
+  
+  #MDSPlots (Betas)
+  par(mfrow = c(1,2))
+  if ("sex" %in% plot) {
+  #Clustering by Sex
+  mdsPlot(vals, sampGroups = meta$sex_lab, sampNames = meta$sid,
+          numPositions=nump, ylim = lim, main = paste0("Sex - Betas - ", as.character(nump)), 
+          pal = sex_pal)
+  
+  mdsPlot(mvals, sampGroups = meta$sex_lab, sampNames = meta$sid,
+          numPositions=nump, ylim = mlim, main = paste0("Sex - M-values - ", as.character(nump)), 
+          pal = sex_pal)
+  }
+  if ("vape" %in% plot) {
+  #Clustering by Vape Status
+  mdsPlot(vals, sampGroups = meta$vape_text, sampNames = meta$sid,
+          numPositions=nump, ylim = lim, main = paste0("Vape Status - Betas - ", as.character(nump)))
+  
+  mdsPlot(mvals, sampGroups = meta$vape_text, sampNames = meta$sid,
+          numPositions=nump, ylim = mlim, main = paste0("Vape Status - M-values - ", as.character(nump)))
+  }
+  if ("center" %in% plot) {
+  #Clustering by center
+  mdsPlot(vals, sampGroups = meta$recruitment_center, sampNames = meta$sid,
+          numPositions=nump, 
+          ylim = lim, 
+          pal = center_colors, 
+          main = paste0("Recruitment Center - Betas - ", as.character(nump)))
+  
+  mdsPlot(mvals, sampGroups = meta$recruitment_center, sampNames = meta$sid,
+          numPositions=nump, ylim = mlim, pal = center_colors, main = paste0("Recruitment Center - M-values - ", as.character(nump)))
+  }
+}
 
-In raw plots, sample clustering can be seen by sex, but no clustering is seen by vape status or recruitment center. 
+```
 
-### Figure 6: Sample Clustering (Noob Data)
-![](MDS_NOOB_Plots.jpeg)
+MDS plots were made using the package `minfi` ver. `r package.version("minfi")` using $\beta$ and M-values preprocessed using the `sesame` pipeline. For each feature of interest, plots were made a) using probes from the whole genome and b) using only autosomal probes. Using only autosomal probes removes the inherrent separation by sex to get a better idea of clustering patterns. 
 
-Data processed using bye-bias correction and background subtraction show similar results to the raw data. Samples cluster only by sex. 
+### Figure 6: Sample Clustering (Sex)
+
+#### Whole Genome
+
+```{r fig.height=8, fig.width=12}
+#Whole Genome
+make_mds_plots(betas, metadata_sex, plot = "sex", nump = 1000, mlim = c(-20, 20))
+make_mds_plots(betas, metadata_sex, plot = "sex", nump = 10000, lim = c(-40, 40), mlim = c(-100, 100))
+```
+
+#### Autosomes Only
+
+```{r fig.height=8, fig.width=12}
+#Autosomal
+make_mds_plots(betas_auto, metadata_sex, plot = "sex", lim = c(-10, 10), mlim = c(-50, 50))
+make_mds_plots(betas_auto, metadata_sex, plot = "sex", lim = c(-10, 10), nump = 10000)
+```
+  
+### Figure 7: Sample Clustering (Vape Status)  
+
+#### Whole Genome
+```{r fig.height=8, fig.width=12}
+make_mds_plots(betas, metadata_sex, plot = "vape", nump = 1000)
+make_mds_plots(betas, metadata_sex, plot = "vape", nump = 10000, lim = c(-10, 10), mlim = c(-100, 100))
+```
+
+#### Autosomes Only
+```{r fig.height=8, fig.width=12}
+make_mds_plots(betas_auto, metadata_sex, plot = "vape", lim = c(-10, 10))
+make_mds_plots(betas_auto, metadata_sex, plot = "vape", lim = c(-10, 10), nump = 10000)
+```
+  
+### Figure 8: Sample Clustering (Recruitment Center)
+
+#### Whole Genome  
+
+```{r fig.height=8, fig.width=12}
+make_mds_plots(betas, metadata_sex, plot = "center", nump = 1000)
+make_mds_plots(betas, metadata_sex, plot = "center", nump = 10000, lim = c(-100, 100))
+```
+
+#### Autosomes Only  
+
+```{r fig.height=8, fig.width=12}
+make_mds_plots(betas_auto, metadata_sex, plot = "center", lim = c(-20, 20))
+make_mds_plots(betas_auto, metadata_sex, plot = "center", lim = c(-10, 10), nump = 10000)
+```
 
 # Conclusions
-Overall, $\beta$- and M-values follow their expected distributions. A more stringent cutoff for detection p-value (e.g. <0.01) may help to decrease noise. Sample 17 falls in the 1st percentile for mean signal intensity and should be noted for future analyses. Visualizations are still needed to assess sample clustering due to technical effects, sex, and recruitment center. 
+
+The review of sample quality and clustering patterns returned one subject (SID = `r low_qual_id`) that fell in the 1st percentile for mean intensity. There is also a clear sex effect in the data that will be accounted for by including sex as a model covariate. 
+
 
 # References
+
 ::: {#refs}
 :::
+
 <!-- footer -->
 
 ------------------------------------------------------------------------
