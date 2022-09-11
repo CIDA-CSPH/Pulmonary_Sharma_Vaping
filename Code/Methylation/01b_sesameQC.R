@@ -22,16 +22,13 @@ format_num <- function(number, digits = 0, format = "f") {
 
 ################# Read in Betas, M-Values, and Metadata ##################
 #betas
-betas <- read_tsv(here("DataProcessed/methylation/methylation_betas.txt"))
+betas <- read_tsv(here("DataProcessed/methylation/methylation_betas_BMIQ.txt"))
 
 #Mvals
-mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals.txt"))
+mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_BMIQ.txt"))
 
 #Autosomal betas
-betas_auto <- read_tsv(here('DataProcessed/methylation/autosomal_betas.txt'))
-
-#Autosomal mvals
-m_auto <- read_tsv(here('DataProcessed/methylation/autosomal_mvals.txt'))
+betas_auto <- read_tsv(here('DataProcessed/methylation/autosomal_betas_BMIQ.txt'))
 
 #Metadata with autosomal intensities and predicted sex
 metadata_sex <- read_csv(here("DataProcessed/methylation/metadata_all_sex_2022_08_30.csv"))
@@ -98,23 +95,60 @@ methylation_qc %>%
        color = NULL)
 
 ################## Dye-Bias Correction Visualization ##############
-# ex_folder_path <- searchIDATprefixes(here("DataRaw/methylation/RawIdat/Slide_1_205310770060"))[1:3]
-# methylation_raw <- lapply(ex_folder_path,readIDATpair)
-# 
-# par(mfrow=c(2,3))
-# sesameQC_plotRedGrnQQ(methylation_raw$`205310770060_R01C01`, main = "R01C01 Before")
-# sesameQC_plotRedGrnQQ(methylation_raw$`205310770060_R02C01`, main = "R02C01 Before")
-# sesameQC_plotRedGrnQQ(methylation_raw$`205310770060_R03C01`, main = "R03C01 Before")
-# sesameQC_plotRedGrnQQ(prepSesame(methylation_raw$`205310770060_R01C01`, prep = "QCD"), main = "R01C01 After")
-# sesameQC_plotRedGrnQQ(prepSesame(methylation_raw$`205310770060_R02C01`, prep = "QCD"), main = "R02C01 After")
-# sesameQC_plotRedGrnQQ(prepSesame(methylation_raw$`205310770060_R03C01`, prep = "QCD"), main = "R03C01 After")
+ex_folder_path <- searchIDATprefixes(here("DataRaw/methylation/RawIdat/"))
+#set seed for random sample of file paths
+set.seed(404)
+rand_path <- sample(ex_folder_path, 3)
 
+methylation_raw <- lapply(rand_path,readIDATpair)
+
+plot_redgrnqq <- function(methyl_dat){
+
+   par(mfrow=c(3,3), mar=c(3,3,2,1))
+  
+  #Make Raw Plots
+  for (h in seq(1,3)){
+    sesameQC_plotRedGrnQQ(prepSesame(methyl_dat[[h]], prep = ""),
+                              main= paste0(names(methyl_dat)[[h]], " (Raw)"))
+  }
+  #Make noob Plots
+  for (i in seq(1,3)){
+    sesameQC_plotRedGrnQQ(prepSesame(methyl_dat[[i]], prep = "QCDPB"),
+                              main= paste0(names(methyl_dat)[[i]], " (noob)"))
+  }
+
+  #Make noob + BMIQ Plots
+  for (j in seq(1,3)){
+    sesameQC_plotRedGrnQQ(prepSesame(methyl_dat[[j]], prep = "QCDPBM"),
+                              main= paste0(names(methyl_dat)[[j]], " (noob + BMIQ)"))
+  }
+}
+
+plot_redgrnqq(methyl_dat = methylation_raw)
 ############### Background Subtraction ########################
 # par(mfrow=c(2,1), mar=c(3,3,2,1))
 # sesameQC_plotBetaByDesign(methylation_raw$`205310770060_R01C01`, main="R01C01 Before", xlab="\beta")
 # sesameQC_plotBetaByDesign(prepSesame(methylation_raw$`205310770060_R01C01`, prep = "QCDPB"), main="R01C01 After", xlab="\beta")
 
-
+############### BMIQ + Noob ##########################
+# plot_bmiq <- function(methyl_dat){
+#  
+#    par(mfrow=c(2,3), mar=c(3,3,2,1))
+#   
+#   #Make noob Plots
+#   for (i in seq(1,3)){
+#     sesameQC_plotBetaByDesign(prepSesame(methyl_dat[[i]], prep = "QCDPB"), 
+#                               main= paste0(names(methyl_dat)[[i]], " (noob)"))
+#   }
+#   
+#   #Make noob + BMIQ Plots
+#   for (j in seq(1,3)){
+#     sesameQC_plotBetaByDesign(prepSesame(methyl_dat[[j]], prep = "QCDPBM"), 
+#                               main= paste0(names(methyl_dat)[[j]], " (noob + BMIQ)"))
+#   }
+# }
+# 
+# plot_bmiq(methyl_dat = methylation_raw)
 ######################## Beta and M-Value distributions #######################
 
 ####### Betas ############
@@ -232,5 +266,5 @@ make_mds_plots <- function(vals, meta, plot = c("sex", "vape", "center")){
 }
 
 
-make_mds_plots(betas, metadata_sex, plot = "sex")
+make_mds_plots(betas, metadata_sex, plot = "vape")
 make_mds_plots(betas_auto, metadata_sex)

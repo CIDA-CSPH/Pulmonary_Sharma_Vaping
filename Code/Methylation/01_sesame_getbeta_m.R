@@ -71,9 +71,13 @@ targets <- targets %>%
 # betas <- do.call(cbind, BiocParallel::bplapply(methylation_background, getBetas)) %>% as.data.frame()
 
 ################ get Betas with openSesame Pipeline #########
-betas <- openSesame(folder_raw_dat) %>% as.data.frame()
+#Noob only
+#betas <- openSesame(folder_raw_dat) %>% as.data.frame()
 
+#Noob + BMIQ
+betas <- openSesame(folder_raw_dat, prep = "QCDPBM") %>% as.data.frame()
 ################## Drop probes with NA for > 10% of Samples #################
+
 cpg_drop_na <- function(betas) {
   # how many NAs for each CPG Site
   cpg_na_count <-  apply(betas, 1, function(x) {sum(is.na(x))})
@@ -96,14 +100,19 @@ betas <- betas %>%
   mutate(CpG_Site = rownames(.)) %>%
   select(CpG_Site, everything())
 
+betas_drop <- betas_drop %>%
+  mutate(CpG_Site = rownames(.)) %>%
+  select(CpG_Site, everything())
+
 ################# Write out Betas #####################
 
-# write_tsv(betas_drop, file = here("DataProcessed/methylation/methylation_betas.txt"))
-# 
-# write_tsv(betas, file = here("DataProcessed/methylation/methylation_betas_full.txt"))
+#write_tsv(betas_drop, file = here("DataProcessed/methylation/methylation_betas_BMIQ.txt"))
+
+#write_tsv(betas, file = here("DataProcessed/methylation/methylation_betas_full_BMIQ.txt"))
 
 
 ############## Convert to M Values #####################
+
 mvals <- betas %>% 
   select(-CpG_Site) %>% 
   apply(., 2, BetaValueToMValue) %>% 
@@ -114,14 +123,17 @@ mvals <- betas %>%
 mvals_drop <- cpg_drop_na(mvals)
 
 ################# Write out M-Values #####################
-# write_tsv(mvals_drop, file = here("DataProcessed/methylation/methylation_mvals.txt"))
+ #write_tsv(mvals_drop, file = here("DataProcessed/methylation/methylation_mvals_BMIQ.txt"))
 # 
-# write_tsv(mvals, file = here("DataProcessed/methylation/methylation_mvals_full.txt"))
+ #write_tsv(mvals, file = here("DataProcessed/methylation/methylation_mvals_full_BMIQ.txt"))
 
 ################ Get Betas using only Autosomes #####################
-betas <- read_tsv(here("DataProcessed/methylation/methylation_betas_full.txt"))
+betas <- read_tsv(here("DataProcessed/methylation/methylation_betas_full_BMIQ.txt"))
 
 get_auto_vals <- function(betas, get_value = "Betas"){
+  #Load in raw idats
+  methylation_raw <- lapply(searchIDATprefixes(folder_raw_dat), readIDATpair)
+  
   #Get annotation
   autosomes <- sesameData_getAutosomeProbes("EPIC")
   
@@ -131,14 +143,17 @@ get_auto_vals <- function(betas, get_value = "Betas"){
   
   autosomal_probes <- probe_annos[!probe_annos$seqnames %in% c("chrX", "chrY", "chrM"),]
   
+  #Filter for only autosomal probes
   methyl_raw_auto <- lapply(methylation_raw, function(x) {
     x %>% 
       filter(Probe_ID %in% rownames(autosomal_probes))
   })
-  
-  betas_auto <- openSesame(methyl_raw_auto) %>% as.data.frame()}
+  #Noob Only 
+  betas_auto <- openSesame(methyl_raw_auto, prep = "QCDPBM") %>% as.data.frame()
+  return(betas_auto)
+  }
 
-
+betas_auto <- get_auto_vals(betas)
 
 #Turn CPG into it's own column
 betas_auto <- betas_auto %>%
@@ -150,15 +165,15 @@ betas_auto_drop <- cpg_drop_na(betas_auto)
 ############### Write out Betas #######################
 
 #With NA's Dropped
-write_tsv(betas_auto_drop, here('DataProcessed/methylation/autosomal_betas.txt'))
+write_tsv(betas_auto_drop, here('DataProcessed/methylation/autosomal_betas_BMIQ.txt'))
 
 #Full DF
-write_tsv(betas_auto, here('DataProcessed/methylation/autosomal_betas_full.txt'))
+write_tsv(betas_auto, here('DataProcessed/methylation/autosomal_betas_full_BMIQ.txt'))
 
 
 
 ############### Convert to Mvals #######################
-betas_auto <- read_tsv(here('DataProcessed/methylation/autosomal_betas.txt'))
+#betas_auto <- read_tsv(here('DataProcessed/methylation/autosomal_betas.txt'))
 
 m_auto <- betas_auto %>%
   select(-CpG_Site) %>% 
@@ -170,9 +185,9 @@ m_auto <- betas_auto %>%
 
 m_auto_drop <- cpg_drop_na(m_auto)
 ############### Write out mvals #######################
-#With NA's Dropped
-write_tsv(m_auto_drop, here('DataProcessed/methylation/autosomal_mvals.txt'))
-
-#Full DF
-write_tsv(m_auto, here('DataProcessed/methylation/autosomal_mvals_full.txt'))
+# #With NA's Dropped
+# write_tsv(m_auto_drop, here('DataProcessed/methylation/autosomal_mvals.txt'))
+# 
+# #Full DF
+# write_tsv(m_auto, here('DataProcessed/methylation/autosomal_mvals_full.txt'))
 
