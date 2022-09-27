@@ -67,9 +67,9 @@ Methylation samples were taken using the 850K 'EPIC' array. All quality control 
 
 Samples will be evaluated for a low mean-intensity to identify potential outliers with low-quality methylation values. Outliers will be defined by samples in the bottom 1%.
 
-## Probe Masking
+## Probe Removal
 
-The `SeSAMe` package uses probe 'masking' instead of probe removal. These terms are interchangeable; however, it should be noted that 'masked' probes are not actually removed from the dataset. They are only ignored by `SeSAMe` when completing down-stream analyses. Probes are masked in two ways:
+Probes can be removed from the data set in two ways:
 
 1.  [Experiment-independent Probe Masking]{.underline}: Probes that are masked due to non-unique mapping or influence by SNPs.
 2.  [Experiment-dependent Probe Masking]{.underline}: Probes that are masked based on the detection p-value, which represents the probability of a detection signal being background flourescence. Masks are based on the detection p-value, which represents the probability of a detection signal being background fluorescence [@zhou2018].
@@ -78,11 +78,11 @@ Experiment-independent probe masking is set by a pre-determined list of probes s
 
 ## Data Transformations
 
-There are two data transformations within the `sesame` pipeline. The first is a dye bias correction. Dye bias refers to bias in the methylation values due to the performance of the red and green dyes that create flourescence and are then interpreted as methylation values. There are several corrections that can be applied to make the red and green values more comparable. `sesame` specifically implements a non-linear dye bias correction.
+There are several data transformations within the `sesame` pipeline. The first is a dye bias correction. Dye bias refers to bias in the methylation values due to the performance of the red and green dyes that create flourescence and are then interpreted as methylation values. There are several corrections that can be applied to make the red and green values more comparable. `sesame` specifically implements a non-linear dye bias correction.
 
 The next transformation within the `openSesame` pipeline is background subtraction. The purpose of background subtraction is to align the distribution of beta values for Infinium I and II probes in order to make them more comparable. The default method for `sesame` is a normal-exponential deconvolution using out-of-band probes or 'noob' [@triche2013].
 
-The previous version of this report did **not** include BMIQ normalization, but this report will to address the concern for insufficient within-array normalization. BMIQ works in conjunction with noob to correct type II probe bias [@liu2016].
+Earlier versions of this report did **not** include BMIQ normalization, but this report will to address the concern for insufficient within-array normalization. BMIQ works in conjunction with noob to correct type II probe bias [@liu2016].
 
 ## Beta and M-Value Distributions
 
@@ -91,6 +91,10 @@ The product of the `SeSAMe` data pipeline is a matrix of beta values. Beta value
 $$M = log_2(\frac{\beta}{1 - \beta})$$
 
 Visualizations will ensure the proper distribution of $\beta$ and M-values, respectively.
+
+## RUV
+
+Nasal-epithelieal swabs were used to collect genetif 
 
 ## Sample Clustering
 
@@ -179,7 +183,7 @@ low_qual_id <- as.character(methylation_qc[methylation_qc$outlier == T, "sid"])
 
 ### Figure 1: Sample Quality Outliers
 
-```{r}
+```{r fig.height=2, fig.width=4}
 
 ## Plot Outliers ##
 methylation_qc %>% 

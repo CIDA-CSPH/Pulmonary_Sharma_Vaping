@@ -40,7 +40,7 @@ methylation_qc <- left_join(methylation_qc, metadata_sex %>% select(rna_id, meth
 #Read in and join methyl metadata
 samplesheet <- left_join(
   read_csv(here("DataRaw/methylation/Metadata/SSharma_48_samplesheet_05202021.csv"), skip = 7) %>%
-    select(-`Sample_Group`, -`Pool_ID`),
+    dplyr::select(-`Sample_Group`, -`Pool_ID`),
   read_excel(here("DataRaw/methylation/Metadata/Sharma_48_5192021Controls.xlsx")) %>%
     mutate(`Sample Name` = as.numeric(`Sample Name`)),
   by = c("Sample_Name" = "Sample Name"))
@@ -68,10 +68,10 @@ targets <- targets %>%
 
 #join metadata back to targets
 targets <- left_join(targets, clin_metadata %>% 
-                       select(methylation_id,sid,sex_lab, age, recruitment_center, vape_6mo_lab),
+                       dplyr::select(methylation_id,sid,sex_lab, age, recruitment_center, vape_6mo_lab),
                      by = c("sample_join" = "methylation_id"))
 
-
+#write_csv(targets, here("DataProcessed/methylation/minfi_targets.csv"))
 # Read in Methylation Data -----------------------------------------------------
 RGset <- read.metharray.exp(targets = targets)
 

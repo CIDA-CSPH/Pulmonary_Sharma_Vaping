@@ -8,7 +8,7 @@ library(janitor)
 
 
 #read in raw gene counts
-raw_gene_count <- read_tsv(file = here("DataRaw/gene_counts_choo.txt"), col_names = T)
+raw_gene_count <- read_tsv(file = here("DataRaw/RNA_Seq/gene_counts_choo.txt"), col_names = T)
 
 
 #remove all genes with 0 counts in 75% or more of samples

@@ -31,12 +31,29 @@ folder_raw_dat <- sample(searchIDATprefixes(here("DataRaw/methylation/RawIdat/")
 #Raw Data
 methylation_raw <- lapply(folder_raw_dat,readIDATpair)
 
+# #Prep QualityMask -> inferinfiniumIchannel -> POOBAH -> Noob -> DyeBiasNL 
+# methyl_mask <- lapply(methylation_raw, qualityMask)
+# 
+# methyl_infer <- lapply(methyl_mask, inferInfiniumIChannel)
+# 
+# methyl_pdet <- lapply(methyl_infer, pOOBAH)
+# 
+# methyl_noob <- lapply(methyl_pdet, noob)
+# 
+# methyl_bmiq <- lapply(methyl_noob, matchDesign)
+# 
+# methyl_noob_dbcorr <- lapply(methyl_noob, dyeBiasNL)
+# 
+# methyl_bmiq_dbcorr <- lapply(methyl_bmiq, dyeBiasNL)
+
 #Prep QualityMask -> inferinfiniumIchannel -> POOBAH -> Noob -> DyeBiasNL 
 methyl_mask <- lapply(methylation_raw, qualityMask)
 
 methyl_infer <- lapply(methyl_mask, inferInfiniumIChannel)
 
-methyl_pdet <- lapply(methyl_infer, pOOBAH)
+methyl_db <- lapply(methyl_infer, dyeBiasNL)
+
+methyl_pdet <- lapply(methyl_db, pOOBAH, return.pval=T)
 
 methyl_noob <- lapply(methyl_pdet, noob)
 
@@ -45,7 +62,6 @@ methyl_bmiq <- lapply(methyl_noob, matchDesign)
 methyl_noob_dbcorr <- lapply(methyl_noob, dyeBiasNL)
 
 methyl_bmiq_dbcorr <- lapply(methyl_bmiq, dyeBiasNL)
-
 
 
 # Plot RedGRNQQ -----------------------------------------------------------
