@@ -49,7 +49,7 @@ library(minfi)
 
 ```{r import data, include=FALSE}
 #import data
-tab1_dat <- read_csv(here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
+tab1_dat <- read_csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv"))
 
 #filter out 1 NA for vape status
 tab1_dat <- tab1_dat %>% 

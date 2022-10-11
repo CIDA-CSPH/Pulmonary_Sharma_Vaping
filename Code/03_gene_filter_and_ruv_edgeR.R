@@ -40,22 +40,23 @@ genes <- rownames(filtered_gene_count)
 
 #Load metadata
 id_relate <- read_tsv(file = here("DataRaw/subject_ids/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
-metadata_unjoined <- read_csv(file = here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
+metadata_unjoined <- read_csv(file = here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv"))
 
+metadata_joined <- metadata_unjoined[metadata_unjoined$rna_id %in% names(filtered_gene_count),]
 
 #Join metadata
-metadata_joined <- id_relate %>% 
-  mutate(new_id = str_pad(new_id, 2, "left", "0") %>% paste0("Sample", .)) %>% 
-  left_join(metadata_unjoined, by = "sid") %>% 
-  filter(new_id %in% names(filtered_gene_count)) %>% 
-  as.data.frame()
+# metadata_joined <- id_relate %>% 
+#   mutate(new_id = str_pad(new_id, 2, "left", "0") %>% paste0("Sample", .)) %>% 
+#   left_join(metadata_unjoined, by = "sid") %>% 
+#   filter(new_id %in% names(filtered_gene_count)) %>% 
+#   as.data.frame()
 
 #Filter out subjects missing vape status
 metadata_joined <- metadata_joined %>% 
   filter(!is.na(vape_6mo_lab))
 
 #Make sure the count data matches
-filtered_gene_count <- filtered_gene_count[,metadata_joined$new_id]
+filtered_gene_count <- filtered_gene_count[,metadata_joined$rna_id]
 
 
 ##Prepare for DESeq2
@@ -91,14 +92,14 @@ ruv_with_12 <- newSeqExpressionSet(as.matrix(filtered_gene_count),
                                 phenoData = data.frame(vape_status, 
                                                        male, 
                                                        age, 
-                                                       row.names = metadata_joined$new_id))
+                                                       row.names = metadata_joined$rna_id))
 
 
 #it appears that sample 12 may be outlier (see teen_vape_exploratory_report) will run RUV both with and without sample
 
 #Remove sample 12 as outlier
 metadata_joined_no12 <- metadata_joined %>% 
-  filter(new_id != 'Sample12')
+  filter(rna_id != 'Sample12')
 
 filtered_gene_count_no12 <- filtered_gene_count %>% 
   select(-Sample12)
@@ -119,7 +120,7 @@ ruv_no12 <- newSeqExpressionSet(as.matrix(filtered_gene_count_no12),
                                 phenoData = data.frame(vape_status_no12, 
                                                        male_no12, 
                                                        age_no12, 
-                                                       row.names = metadata_joined_no12$new_id))
+                                                       row.names = metadata_joined_no12$rna_id))
 
 
 # #considering upper-quartile normalization
@@ -144,7 +145,7 @@ first_pass_residuls <- residuals(first_pass, type="deviance")
 first_pass_residuls_no12 <- residuals(first_pass_no12, type="deviance")
 
 #output the firt pass residuals for comparison with DESeq2
-#write_csv(as.data.frame(first_pass_residuls), file = here("Sharma_Vaping/DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR.csv"))
+#write_csv(as.data.frame(first_pass_residuls), file = here("DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR_2022_10_06.csv"))
 
 #Elbow Method for finding the optimal number of clusters
 set.seed(404)

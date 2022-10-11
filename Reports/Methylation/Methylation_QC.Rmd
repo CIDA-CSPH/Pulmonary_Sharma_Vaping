@@ -55,21 +55,17 @@ kablize <- function(tab, digits = 3) {
 
 The purpose of this report is to document quality-control and data transformation procedures followed to obtain methylation values ($\beta$ and M) for the adolescent vaping study. Much of the code for this report had already been produced by the previous analyst, Cuining Liu. Further steps were taken to dissect the data-pipeline and to support any decisions made moving forward.
 
-**Update 09/09/2022**
-
-The previous version of this report ("Methylation_QC_2022_09_08.html") saw no clustering by vape status, the feature of interest for this study. One concern was the absence of within-array normalization. To address this concern, a 'BMIQ' normalization was performed in addition to the steps previously presented. 'noob' + 'BMIQ' has shown to be a reasonable procedure to improve signal sensitivity previously [@liu2016].
-
 # Methods
 
-Methylation samples were taken using the 850K 'EPIC' array. All quality control steps were conducted using the package `SeSAMe` ver. `r package.version("sesame")`. The steps below are not necessarily presented in chronological order which they were taken. The order of pre-processing steps follows the `openSesame` data pipeline available [here](https://www.bioconductor.org/packages/release/bioc/vignettes/sesame/inst/doc/sesame.html#Preprocessing_Function_Code) [@zhou2018].
+Methylation samples were taken using the 850K 'EPIC' array. All quality control steps were conducted using the package `SeSAMe` ver. `r package.version("sesame")`. The steps below are not necessarily presented in chronological order which they were taken.
 
-## Sample Removal
+## Sample Outliers
 
-Samples will be evaluated for a low mean-intensity to identify potential outliers with low-quality methylation values. Outliers will be defined by samples in the bottom 1%.
+Samples will be evaluated for a low mean-intensity to identify potential outliers with low-quality methylation values.
 
 ## Probe Removal
 
-Probes can be removed from the data set in two ways:
+It is common to remove experimental probes from the data to preserve the biologic variability in the dataset. Probes can be removed from the data set for two reasons:
 
 1.  [Experiment-independent Probe Masking]{.underline}: Probes that are masked due to non-unique mapping or influence by SNPs.
 2.  [Experiment-dependent Probe Masking]{.underline}: Probes that are masked based on the detection p-value, which represents the probability of a detection signal being background flourescence. Masks are based on the detection p-value, which represents the probability of a detection signal being background fluorescence [@zhou2018].
@@ -78,23 +74,31 @@ Experiment-independent probe masking is set by a pre-determined list of probes s
 
 ## Data Transformations
 
-There are several data transformations within the `sesame` pipeline. The first is a dye bias correction. Dye bias refers to bias in the methylation values due to the performance of the red and green dyes that create flourescence and are then interpreted as methylation values. There are several corrections that can be applied to make the red and green values more comparable. `sesame` specifically implements a non-linear dye bias correction.
+There are several data transformations implemented within the `sesame` pipeline in order to minimize variability from technical effects while still maintining biologic variability in the data. The first is a dye bias correction. Dye bias refers to bias in the methylation values due to the performance of the red and green dyes that create flourescence and are then interpreted as methylation values. There are several corrections that can be applied to make the red and green values more comparable. A **non-linear** dye bias correction will be presented here.
 
-The next transformation within the `openSesame` pipeline is background subtraction. The purpose of background subtraction is to align the distribution of beta values for Infinium I and II probes in order to make them more comparable. The default method for `sesame` is a normal-exponential deconvolution using out-of-band probes or 'noob' [@triche2013].
+The next transformation within the `sesame` pipeline is background subtraction. The purpose of background subtraction is to align the distribution of beta values for Infinium I and II probes in order to make them more comparable. The default method for `sesame` is a normal-exponential deconvolution using out-of-band probes or **noob** [@triche2013].
 
-Earlier versions of this report did **not** include BMIQ normalization, but this report will to address the concern for insufficient within-array normalization. BMIQ works in conjunction with noob to correct type II probe bias [@liu2016].
+**BMIQ** normalization was considered *a priori* due to a concern for lack of within-array normalization as interpreted from diagnostic plots. BMIQ works in conjunction with **noob** to correct type II probe bias [@liu2016].
 
 ## Beta and M-Value Distributions
 
-The product of the `SeSAMe` data pipeline is a matrix of beta values. Beta values will be converted to M-values using the logit transformation
+The product of the `sesame` data pipeline is a matrix of beta values. Beta values will be converted to M-values using the logit transformation
 
 $$M = log_2(\frac{\beta}{1 - \beta})$$
 
 Visualizations will ensure the proper distribution of $\beta$ and M-values, respectively.
 
-## RUV
+## Cell Composition Estimation and RUVm
 
-Nasal-epithelieal swabs were used to collect genetif 
+A standard part of methylation pre-processing is to estimate cell composition for the particular sample type acquired because methylation profile can vary greatly across different cell types. Cell composition can be estimated using reference sets (e.g. cord blood has a known cell composition profile), but *reference free* methods do exist for samples that do not have a known profile. In the case of this study, nasal-epithelial tissue was collected and does *not* have a known cell profile. Due to the small sample size of this study, there is a concern that *reference free* cell composition estimates will not be robust to outliers or variability due to technical effects.
+
+In light of our concern, this analysis will use Removal of Unwanted Variability for Methylation (RUVm) implemented in `missMethyl` ver. `r package.version("missMethyl")`. The benefit of using this method is that it will be more robust to the small sample size. The pitfall is that we can not specify what technical variability (e.g. cell type) is captured by this transformation.
+
+The biological variability preserved by this method can be represented by:
+
+$$Beta \ Value = vape_status + age + sex$$
+
+Note that recruitment center is excluded from this model because it is likely confounding vape status (see 'teen_vape_exploratory_report_yyyy_mm_dd.html'). RUVm could also be removing variability due to recruitment center. 
 
 ## Sample Clustering
 
@@ -105,13 +109,13 @@ Visualizations of clustering by sex, recruitment center, and vape status will he
 ```{r echo=FALSE, message=FALSE, warning=FALSE}
 #Read in Needed Files
 #betas
-betas <- read_tsv(here("DataProcessed/methylation/methylation_betas_BMIQ.txt"))
+betas <- read_tsv(here("DataProcessed/methylation/methylation_betas_final_2022_09_27.txt"))
 
 #Mvals
-mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_BMIQ.txt"))
+mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_final_2022_09_27.txt"))
 
 #Autosomal betas
-betas_auto <- read_tsv(here('DataProcessed/methylation/autosomal_betas_BMIQ.txt'))
+betas_auto <- read_tsv(here('DataProcessed/methylation/autosomal_betas_final_2022_09_30.txt'))
 
 #clinical metadata with chromosomal intensity values
 metadata_sex <- read_csv(here("DataProcessed/methylation/metadata_all_sex_2022_08_30.csv"))
@@ -179,18 +183,18 @@ metadata_sex <- metadata_sex %>%
 low_qual_id <- as.character(methylation_qc[methylation_qc$outlier == T, "sid"])
 ```
 
-`r low_qual_id` falls in the bottom 1% of mean signal intensity readings.
+SID `r low_qual_id` falls in the bottom 1% of mean signal intensity readings.
 
 ### Figure 1: Sample Quality Outliers
 
-```{r fig.height=2, fig.width=4}
+```{r fig.height=4, fig.width=4}
 
 ## Plot Outliers ##
 methylation_qc %>% 
   ggplot(aes(y = log2(mean_intensity))) +
   geom_boxplot() +
   geom_text(data = methylation_qc[methylation_qc$outlier == T, ], aes(y = log2(mean_intensity), x = -0.03, label = methylation_qc[methylation_qc$outlier == T, ]$sid), col = "red")+
-  geom_hline(aes(yintercept = log2(quantile(methylation_qc$mean_intensity, probs = 0.01)), col = "1st Percentile"), linetype = "dashed") +
+  geom_hline(aes(yintercept = log2(quantile(mean_intensity, probs = 0.01)), col = "1st Percentile"), linetype = "dashed") +
   theme(axis.title.x=element_blank(),
         axis.text.x=element_blank(),
         axis.ticks.x=element_blank(),
@@ -200,7 +204,7 @@ methylation_qc %>%
        color = NULL)
 ```
 
-Considering the small sample size in this experiment, it is advisable *not* to remove `r low_qual_id`, but it is worth noting for downstream analyses.
+Considering the small sample size in this experiment, it is advisable *not* to remove SID `r low_qual_id`, but it is worth noting for downstream analyses.
 
 ## Probe Masking
 
@@ -218,38 +222,41 @@ exp_probes_rm <- as.numeric(length(raw_idat_example$Probe_ID)) - dim(betas)[1] -
 total_probe_rm <- non_exp_probes_rm + exp_probes_rm
 ```
 
-`r format_num(non_exp_probes_rm)` CpG sites were removed by non-experimental probe masking and `r format_num(exp_probes_rm)` were removed by experimental probe masking (detection p-value \> 0.05 in $\ge$ 10% of samples). `r format_num(total_probe_rm)` probes were removed in total. `r dim(betas)[1]` were included for the anlyses presented in this report. 
+`r format_num(non_exp_probes_rm)` CpG sites were removed by non-experimental probe masking and `r format_num(exp_probes_rm)` were removed by experimental probe masking (detection p-value \> 0.05 in $\ge$ 10% of samples). `r format_num(total_probe_rm)` probes were removed in total. `r dim(betas)[1]` probes were included for the analyses presented in this report.
 
 ## Data Transformations
 
-Figure 2 demonstrates the non-linear dye bias correction in conjunction with 'noob' followed by noob + BMIQ for a random subset of samples.
+Some of the normalization procedures intended for this analysis performed poorly in diagnostic plots. For that reason, several variations of the `sesame` and `minfi` normalization pipelines were considered and compared. A separate report is available that details all of the normalization pipelines that were considered called "normalization_method_compare_yyyy_mm_dd". A high-level summary of some of the methods compared in that report will be described here. For the purpose of this report, the following pipeline was used: 
+
+$$ non-experimental \ probe \ removal \rightarrow InferInfiniumIProbes \rightarrow experimental \ probe \ removal \rightarrow \\ noob \rightarrow BMIQ \rightarrow non-linear \ dye \ bias \ correction$$
+
+
+Figure 2 visualizes dye bias for the method 'dbNL + noob + BMIQ' in which dye-bias correction comes *before* the other transformations, and 'noob + BMIQ + dbNL' where dye-bias correction come *after*. 
 
 ### Figure 2: Dye Bias Correction
 
-![](dye_bias_plot_2022_09_16.jpeg)
+![](final_dyebias_plots_2022_09_30.jpeg)
 
-The inclusion of a dye-bias correction and noob shows improvement over the raw data, but there is still a slight bias towards green which would correspond to unmethylated probes. These plots suggest the the inclusing of the "noob + bmiq" normalization method induces additional bias towards green probes and is visually more biased than the raw data.   
+In summary, the dye bias correction performs well when only 'noob' is used as a normalization process. Adding BMIQ to the normalization pipeline induces dye-bias back into the plots (plots in the second row perform poorly). Moving the dye-bias correction to the *end* of the normalization pipeline seems to correct this issue. Table 1 attempts to quantify the performance of each method. Each value represents the proportion of probes that fell within the **mean** distance of the 'x = y' line, using the mean distance of the raw plots.  
 
-Table 2 attempts to quantify the performance for each of the plots presented above. Each value represents the proportion of values that were below the average distance away from the 'x = y' line in the Q-Q Plots. Values closer to 1 are desirable. 
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+db_eval <- read_csv(here("DataProcessed/methylation/dye_bias_quality_check.csv")) %>% as.data.frame()
 
-### Table 2: Q-Q Plot Performance
-```{r message=FALSE, echo=TRUE}
-dye_bias_eval <- read_csv(here("DataProcessed/methylation/dye_bias_quality_check.csv")) %>% as.data.frame()
+rownames(db_eval) <- c("Raw", "dbNL + Noob + BMIQ", "Noob + BMIQ + dbNL")
 
-rownames(dye_bias_eval) <- c("Raw", "Noob", "Noob + BMIQ")
-
-dye_bias_eval %>% kablize(digits = 2)
+db_eval %>% kablize()
 ```
 
-Table 2 shows that dye bias improves with noob normalization, but actually has *more* bias after BMIQ normalization in the three cases presented. 
+Table 2 concludes that 'noob + BMIQ + dbNL' has the lowest proportion of sites that fall outside of the mean difference.  
 
-Figure 3 demonstrates a combination of the 'noob' and 'BMIQ' method of background subtraction for three randomly selected samples.
+Figure 3 shows the distribution of Infinium I and II beta values for three randomly selected samples across the two different methods. 
+
 
 ### Figure 3: Sample Beta Value Distribution for Infinium I and II Probes
 
-![](Noob + BMIQ Plot.jpeg)
+![](final_betas_distn_2022_09_30.jpeg)
 
-'noob' background subtraction in conjunction with 'BMIQ' normalization shifted the distributions of probes to have modes closer to 0 and 1 (the expected distribution of beta values). Additionally, it appears that some noise was removed from the unmethylated beta values.
+It is clear from figure three that the Infinium I beta value distribution is shifted and has better allignment with Infinium II probes, making them more comparable. Moving dye bias correction to the end of the pipeline induces some noise around $\beta = 0.7$, but is acceptable for the added benefit of limited dye-bias. The 'noob + BMIQ + dbNL' method will be used moving forward. 
 
 ## Beta and M-Value Distributions
 
@@ -259,11 +266,11 @@ Overall, $\beta$ and M-values followed their expected distributions with peaks n
 
 ![](beta_m_dist_BMIQ_2022_09_09.jpeg)
 
-Figure 4 indicates some noise around $\beta$ = 0.5 or $M$ = 0. This noise could indicate probes that were not removed by experiment-dependent probe masking. Noise may be reduced at a more stringent threshold for detection p-values (e.g. \< 0.01).
+Figure 4 indicates some noise around $\beta$ = 0.5 or $M$ = 0, but falls within acceptable levels.
 
 ## Clustering by Sex
 
-Visualization of the samples by median X and Y chromosome intensities helps to identify samples with poor quality or samples whose clinical sex do not match predicted sex based on these values. Figure 5 displays plots of median intensity for X and Y chromosomes color-coded for both clinical and predicted sex.
+Visualization of the samples by median X and Y chromosome intensities helps to identify samples with poor quality or samples whose clinical sex do not match their predicted sex base on their methylation profile. Figure 5 displays plots of median intensity for X and Y chromosomes color-coded for both clinical and predicted sex.
 
 ### Figure 5: Sex Verification
 
@@ -475,13 +482,13 @@ make_mds_plots_n <- function(vals, meta, plot = c("sex", "vape", "center"), nump
 
 ```
 
-MDS plots were made using the package `minfi` ver. `r package.version("minfi")` using $\beta$ and M-values preprocessed using the `sesame` pipeline. For each feature of interest, plots were made a) using probes from the whole genome and b) using only autosomal probes. Using only autosomal probes removes the inherrent separation by sex to get a better idea of clustering patterns.
+For each feature of interest, MDS plots were made using a) probes from the whole genome and b) only autosomal probes. Using only autosomal probes removes the inherent separation by sex to get a better idea of clustering patterns.
 
 ### Figure 6: Sample Clustering (Sex)
 
 #### All Chromosomes (Including X and Y)
 
-```{r fig.height=8, fig.width=12}
+```{r fig.height=6, fig.width=12}
 #Whole Genome
 make_mds_plots_n(betas, metadata_sex, plot = "sex", nump = 1000, mlim = c(-20, 20))
 make_mds_plots_n(betas, metadata_sex, plot = "sex", nump = 10000, lim = c(-40, 40), mlim = c(-100, 100))
@@ -489,7 +496,7 @@ make_mds_plots_n(betas, metadata_sex, plot = "sex", nump = 10000, lim = c(-40, 4
 
 #### Autosomes Only
 
-```{r fig.height=8, fig.width=12}
+```{r fig.height=6, fig.width=12}
 #Autosomal
 make_mds_plots_n(betas_auto, metadata_sex, plot = "sex", lim = c(-10, 10), mlim = c(-50, 50))
 make_mds_plots_n(betas_auto, metadata_sex, plot = "sex", lim = c(-10, 10), nump = 10000)
@@ -498,14 +505,17 @@ make_mds_plots_n(betas_auto, metadata_sex, plot = "sex", lim = c(-10, 10), nump 
 When retaining the X and Y chromosomes, the samples cluster by sex, as expected. When looking only at the autosomal chromosomes, there is no additional clustering that needs to be accounted for.
 
 ### Figure 7: Sample Clustering (Vape Status)
-#### All Chromosomes  
-```{r fig.height=8, fig.width=12}
+
+#### All Chromosomes
+
+```{r fig.height=6, fig.width=12}
 make_mds_plots_n(betas, metadata_sex, plot = "vape", nump = 1000)
 make_mds_plots_n(betas, metadata_sex, plot = "vape", nump = 10000, lim = c(-10, 10), mlim = c(-100, 100))
 ```
-  
-#### Autosomes Only  
-```{r fig.height=8, fig.width=12}
+
+#### Autosomes Only
+
+```{r fig.height=6, fig.width=12}
 #Autosomal
 make_mds_plots_n(betas_auto, metadata_sex, plot = "vape", lim = c(-10, 10), mlim = c(-50, 50))
 make_mds_plots_n(betas_auto, metadata_sex, plot = "vape", lim = c(-10, 10), nump = 10000)
@@ -514,26 +524,53 @@ make_mds_plots_n(betas_auto, metadata_sex, plot = "vape", lim = c(-10, 10), nump
 The previous version of this report ("Methylation_QC_2022_09_08.html") saw no clustering by vape status. After the addition of 'BMIQ' normalization, there may be some weak clustering by vape status. It is also worthwhile to check for clustering along further MDS coordinates.
 
 ### Figure 8: Vape Status Clustering (MDS 3 & 4)
-```{r fig.height=8, fig.width=12}
+
+```{r fig.height=6, fig.width=12}
 make_mds_plots_n(betas, metadata_sex, plot = "vape", nump = 1000, lim = c(-5, 5), mlim = c(-15, 15), n_mds = 4)
 make_mds_plots_n(betas, metadata_sex, plot = "vape", nump = 10000, lim = c(-5, 5), mlim = c(-15, 15), n_mds = 4)
 ```
 
-Looking at MDS coordinates 3 and 4 for vape status, there is still no obvious clustering pattern. This may indicate technical effects still present in the data that were not handled well by 'noob + bmiq' normalization, or it could indicate a lack of biological signal. It is hard to say at this stage, but perhaps other normalization procedures are necessary. 
-
+Looking at MDS coordinates 3 and 4 for vape status, there is still no obvious clustering pattern. This may indicate technical effects still present in the data that were not handled well by 'noob + bmiq' normalization, or it could indicate a lack of biological signal. It is hard to say at this stage, but perhaps other normalization procedures are necessary.
 
 ### Figure 8: Sample Clustering (Recruitment Center)
 
-```{r fig.height=8, fig.width=12}
+```{r fig.height=6, fig.width=12}
 make_mds_plots_n(betas, metadata_sex, plot = "center", nump = 1000)
 make_mds_plots_n(betas, metadata_sex, plot = "center", nump = 10000, lim = c(-100, 100), mlim = c(-100, 100))
 ```
 
-There is no visual clustering by recruitment center. 
+There is no visual clustering by recruitment center.
+
+
+
+## RUVm
+
+
+For RUVm, two methods were considered. The first was the standard implementation from `missMethyl`. This method estimated all of the probes to act as empirical controls (see Adjusted: RUV-inverse below). The methods that implement "RUV-4" appeared to be more robust for k = 1 and k = 2 factors. 
+
+### Figure 9: K-Factor Selection
+
+![](ruvm_elbow_plot_2022_19_29.jpeg)
+
+From the elbow plot above, we can see that the total within-cluster sum of squares gains great benefit from k = 1 to k = 2 and then levels off. The following plots will consider k = 1 and k = 2 factors for inclusion in the model.  
+
+### Figure 10: RLE Plots
+
+![](RLE_Plot_RUV_2022_10_04.jpeg)
+
+Figure 10 shows RLE plots for the different levels of K being considered for this analysis. It appears that many samples benefit from adjusting K = 0 to K = 1. Some samples may benefit minimally from adjusting to K = 1 to K = 2. 
+
+### Figure 11: Clustering by Vape Status after RUVm
+![](RUVm_vapestatus_2022_09_29.jpeg)
+Figure 11 shows pca plots after pursuing several versions of RUVm. The RUV-inverse method proved to be problematic as it estimated **all** probes to be empirical controls and attributes 100% of the variability in the data to the first PC. The bottom two plots present PCA plots for a variation of RUVm which uses 'RUV-4' as opposed to RUV-inverse in the second round of empirical control estimation. This method performed favorably over RUV-inverse. There is noticibly better clustring by vape status in both the K = 1 and K = 2 plots. In the interest of maintaining statistical power with a small sample size, this anlysis will proceed using **K = 1** factors of unwanted variability. 
+
+### Recruitment Center  
+![](ruvm_center_2022_09_29.jpeg)  
+There is no visual clustering by recruitment center, however it will still be adjusted for in the model due to it's confounding relationship with vape status.  
 
 # Conclusions
 
-The review of sample quality and clustering patterns returned one subject (SID = `r low_qual_id`) that fell in the 1st percentile for mean intensity. There is also a clear sex effect in the data that will be accounted for by including sex as a model covariate. The inclusion of the "noob + BMIQ" normalization method may have induced some weak clustering by vape status, but also induced noticeable green dye-bias. This bias should be noted for downstream analyses as models may tend to underestimate methylation values for some sites.  
+Of the normalization methods that were attempted for these data, this report shows that 'noob + BMIQ + dbNL' is a favorable method based on the distribution of Infinium I and II beta values and dye bias diagnostics. The review of sample quality and clustering patterns returned one subject (SID = `r low_qual_id`) that fell in the 1st percentile for mean intensity. That sample did not show up as an outlier in MDS plots after normalization and will be included for further analyses. There is also a clear sex effect in the data that will be accounted for by including sex as a model covariate. Up to this point, MDS and PCA plots show notable clustering by vape status and not by recruitment center. Both covariates will be included in the final model to account confounding in addition to a single RUV factor.
 
 # References
 

@@ -17,7 +17,7 @@ format_num <- function(number, digits = 0, format = "f") {
   formatC(number, digits = digits, format = format, big.mark = ",")
 }
 ################## Read in results #################
-vape_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
+vape_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
 
 #Fix Ensemble ID's  and join with symbols
 vape_res$ensg <- gsub("\\..*", "", vape_res$ensg)
@@ -49,8 +49,8 @@ names(ranks_entrez) <- vape_res$ENTREZID
 #get_kegg("hsa", path = here("DataRaw/enrichment"))
 
 ncbi_to_kegg <- read_tsv("DataRaw/enrichment/ncbi_to_kegg2022-06-20Release_102.0+_06-20_Jun_22.txt")
-kegg_to_pathway <- read_tsv("DataRaw/enrichment/kegg_to_pathway2022-06-15Release_102.0+_06-15_Jun_22.txt")
-pathway_to_species <- read_tsv("DataRaw/enrichment/pathway_to_species2022-06-15Release_102.0+_06-15_Jun_22.txt")
+kegg_to_path <- read_tsv("DataRaw/enrichment/kegg_to_pathway2022-06-20Release_102.0+_06-20_Jun_22.txt")
+path_to_name <- read_tsv("DataRaw/enrichment/pathway_to_species2022-06-20Release_102.0+_06-20_Jun_22.txt")
 
 #set column names
 colnames(ncbi_to_kegg) <- c("ncbi", "kegg")
@@ -242,7 +242,9 @@ go_ind <- format_res(result = go_res,
                      path = go_pathways,
                      ranks = ranks_entrez)
 
-
+write_csv(kegg_ind, here("DataProcessed/gsea/kegg_results_2022_10_06.csv"))
+write_csv(react_ind, here("DataProcessed/gsea/react_results_2022_10_06.csv"))
+write_csv(go_ind, here("DataProcessed/gsea/go_results_2022_10_06.csv"))
 ########################## Visualizations and Tables ###########################
 
 get_paths_res <- function(res, res_ind) {

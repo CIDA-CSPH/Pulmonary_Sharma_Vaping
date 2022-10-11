@@ -105,9 +105,9 @@ Results presented in this report have been simplified to include only the number
 
 ```{r}
 #Read in results
-kegg_ind <- read_csv(here("DataProcessed/gsea/kegg_results_2022_07_05.csv"))
-react_ind <- read_csv(here("DataProcessed/gsea/react_results_2022_07_05.csv"))
-go_ind <- read_csv(here("DataProcessed/gsea/go_results_2022_07_05.csv"))
+kegg_ind <- read_csv(here("DataProcessed/gsea/kegg_results_2022_10_06.csv"))
+react_ind <- read_csv(here("DataProcessed/gsea/react_results_2022_10_06.csv"))
+go_ind <- read_csv(here("DataProcessed/gsea/go_results_2022_10_06.csv"))
 
 #Summary table
 get_paths_res <- function(res_ind) {

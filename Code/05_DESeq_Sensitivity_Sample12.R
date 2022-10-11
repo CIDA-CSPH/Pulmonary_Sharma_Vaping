@@ -3,30 +3,32 @@ library(ggpubr)
 library(tidyverse)
 library(here)
 library(DESeq2)
-library(pcaExplorer)
 library(RColorBrewer)
 library(kableExtra)
 library(ggbreak)
 
 ######################### Read in files so that they are unaltered and join ###############################
 filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_05_04.csv")))
-metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/metadata_joined_rnaseq_04_20_2022.csv")))
+metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv")))
 ruv_factor_dat <- read_csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_04_20.csv"))
 ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
 gene_annotations <- read_tsv(here("DataRaw/RNA_Seq/gencode_annotations_choo.txt"))
-de_full_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
+de_full_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
 
 #fix rownames of filtered gene count and ruv_counts
 rownames(filtered_gene_count) <- filtered_gene_count$Feature
-filtered_gene_count <- filtered_gene_count %>% 
-  dplyr::select(-Feature)
+
+filtered_gene_count_no12 <- filtered_gene_count %>% 
+  dplyr::select(-c(Feature, Sample12))
+
+metadata_joined_no12 <- metadata_joined[metadata_joined$rna_id %in% names(filtered_gene_count_no12),]
 
 #join metadata with ruv factor data
-metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = "new_id", copy = T) %>% 
-  select(-c(vape_status, age.y, male)) 
-metadata_joined <- metadata_joined %>%
-  mutate(age = age.x, ruv_k1 = W_1, ruv_k2 = W_2) %>% 
-  select(-c(age.x, W_1, W_2))
+metadata_joined_no12 <- left_join(metadata_joined_no12,ruv_factor_dat, by = c("rna_id" = "new_id")) %>% 
+  select(-c(vape_status, age.y, male)) %>% 
+  dplyr::rename("ruv_k1" = W_1,
+                "ruv_k2" = W_2)
+
 
 #fix gene annotations
 gene_annotations <- gene_annotations %>% 
@@ -39,38 +41,29 @@ ruv_norm_counts <- ruv_norm_counts %>%
 
 ######################### Prepare Metadata ###############################
 #Set factor levels
-metadata_joined$vape_6mo_lab <- factor(metadata_joined$vape_6mo_lab, levels = c("Did Not Vape in Last 6 Months", "Vaped in Last 6 Months"), 
+metadata_joined_no12$vape_6mo_lab <- factor(metadata_joined_no12$vape_6mo_lab, levels = c("Did Not Vape in Last 6 Months", "Vaped in Last 6 Months"), 
                                        labels = c("not_vaped", "vaped"))
 
-metadata_joined$sex_lab <- factor(metadata_joined$sex_lab, levels = c("Female", "Male"))
+metadata_joined_no12$sex_lab <- factor(metadata_joined_no12$sex_lab, levels = c("Female", "Male"))
 
-metadata_joined$recruitment_center <- factor(metadata_joined$recruitment_center, levels = c("Aurora", "CommCity/Denver", "Pueblo"), 
+metadata_joined_no12$recruitment_center <- factor(metadata_joined_no12$recruitment_center, levels = c("Aurora", "CommCity/Denver", "Pueblo"), 
                                              labels = c("Aurora", "CommCity_Denver", "Pueblo"))
 #Scaling Age
-metadata_joined$age <- scale(metadata_joined$age)
+metadata_joined_no12$age <- scale(metadata_joined_no12$age)
 
 #Make Sample ID into row names
-rownames(metadata_joined) <- metadata_joined$new_id
+rownames(metadata_joined_no12) <- metadata_joined_no12$rna_id
 
-metadata_joined <- metadata_joined %>% 
-  select(-new_id)
-
-#check that row and column names are equal
-all(rownames(metadata_joined) == colnames(filtered_gene_count))
 
 ######################### Filter out Sample 12 ###############################
-#metadata
-metadata_joined_no12 <- metadata_joined %>%
-  filter(sid != 102)
-#count data
-filtered_gene_count_no12 <- filtered_gene_count %>%
-  select(-Sample12)
 #ruv normcounts
 ruv_norm_counts_no12 <- ruv_norm_counts %>% 
   select(-Sample12)
 
+#check that row and column names are equal
+all(rownames(metadata_joined_no12) == colnames(filtered_gene_count_no12))
 ######################### Design Matrices ###############################
-full_design <- ~vape_6mo_lab + sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 
+full_design <- ~sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 + vape_6mo_lab 
 
 vape_only_reduced <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2
 
@@ -219,7 +212,7 @@ vape_res_no12 <- format_results(vape_de_no12, gene_annotations)
 
 #with cutoff
 vape_res_no12_cutoff <- vape_res_no12 %>% 
-  filter()
+  filter(abs(log2FoldChange) > 2)
 ######################### P-Value Histograms ###############################
 #Vape Only
 vape_only_phist_no12 <- p_hist(vape_res_no12) +
@@ -242,7 +235,7 @@ vape_ruv_tidy_no12 <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts_no12,
                                    col_data = metadata_joined_no12,
                                    annotation = gene_annotations)
 
-write_csv(vape_ruv_tidy_no12, here("DataProcessed/de_sample12_sensitivity/RUV_Vape_Results_no12_2022_06_14.csv"))
+#write_csv(vape_ruv_tidy_no12, here("DataProcessed/de_sample12_sensitivity/RUV_Vape_Results_no12_2022_06_14.csv"))
 
 ######################### Top Gene Boxplots DE Counts ###############################
 #Set color pallettes to match

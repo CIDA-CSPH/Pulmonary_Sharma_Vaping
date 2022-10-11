@@ -90,7 +90,7 @@ ruv_prep <- newSeqExpressionSet(as.matrix(filtered_gene_count),
 
 
 #Read in residuals matrix (See "03_gene_filter_and_ruv_edgeR.R" for more information on calculation)
-first_pass_residuls <- as.matrix(read_csv(here("DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR.csv")))
+first_pass_residuls <- as.matrix(read_csv(here("DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR_2022_10_06.csv")))
 rownames(first_pass_residuls) <- genes
 colnames(first_pass_residuls) <- metadata_joined$new_id
 
@@ -108,4 +108,4 @@ ruv_k2_write <- pData(ruv_k2) %>%
   mutate(new_id = rownames(.)) %>% 
   select(new_id, everything())
 
-#write_csv(ruv_k2_write, file = "DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_04_20.csv")
+#write_csv(ruv_k2_write, file = "DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_10_04.csv")
