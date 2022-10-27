@@ -157,21 +157,22 @@ vape_de <- run_deseq_lrt(count_data = filtered_gene_count,
 vape_res_2 <- format_results(vape_de, gene_annotations)
 
 #Filter it for boxplots 
-vape_res_2 <- vape_res_2 %>% 
+vape_res_2_cutoff <- vape_res_2 %>% 
   filter(abs(log2FoldChange) > 2)
+
 #Write out results
-write_csv(vape_res_2, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
+#write_csv(vape_res_2, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
 
 ######################### P-Value Histograms ###############################
 
 #Vape Only
-vape_only_phist <- p_hist(vape_res) +
+vape_only_phist <- p_hist(vape_res_2) +
   labs(title = "Vape Only")
 
 ######################### Top Genes Tidy RUV-Norm Counts ###############################
 
 vape_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
-                              de_res = vape_res,
+                              de_res = vape_res_2,
                               col_data = metadata_joined,
                               annotation = gene_annotations)
 

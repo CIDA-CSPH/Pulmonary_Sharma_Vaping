@@ -74,7 +74,7 @@ run_deseq_lrt <- function(count_data, col_data, full_mod, reduced_mod) {
                                          colData = col_data,
                                          design = full_mod)
   #Run DESeq
-  deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod, )
+  deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod)
   
   #Return the results
   return(deseq_run)

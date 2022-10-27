@@ -3,18 +3,17 @@ library(ggpubr)
 library(tidyverse)
 library(here)
 library(DESeq2)
-library(pcaExplorer)
 library(RColorBrewer)
 library(kableExtra)
 library(ggbreak)
 
 ######################### Read in files so that they are unaltered and join ###############################
-filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_05_04.csv")))
-metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/metadata_joined_rnaseq_04_20_2022.csv")))
-ruv_factor_dat <- read_csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_04_20.csv"))
-ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
+filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_10_13.csv")))
+metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv")))
+ruv_factor_dat <- read_csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_10_13.csv"))
+ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_10_13.csv")))
 gene_annotations <- read_tsv(here("DataRaw/RNA_Seq/gencode_annotations_choo.txt"))
-de_full_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
+de_full_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_13.csv"))
 
 #fix rownames of filtered gene count and ruv_counts
 rownames(filtered_gene_count) <- filtered_gene_count$Feature
@@ -22,11 +21,12 @@ filtered_gene_count <- filtered_gene_count %>%
   dplyr::select(-Feature)
 
 #join metadata with ruv factor data
-metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = "new_id", copy = T) %>% 
+metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = "rna_id", copy = T) %>% 
   select(-c(vape_status, age.y, male)) 
 metadata_joined <- metadata_joined %>%
   mutate(age = age.x, ruv_k1 = W_1, ruv_k2 = W_2) %>% 
-  select(-c(age.x, W_1, W_2))
+  select(-c(age.x, W_1, W_2)) %>% 
+  drop_na(ruv_k1)
 
 #fix gene annotations
 gene_annotations <- gene_annotations %>% 
@@ -50,10 +50,8 @@ metadata_joined$recruitment_center <- factor(metadata_joined$recruitment_center,
 metadata_joined$age <- scale(metadata_joined$age)
 
 #Make Sample ID into row names
-rownames(metadata_joined) <- metadata_joined$new_id
+rownames(metadata_joined) <- metadata_joined$rna_id
 
-metadata_joined <- metadata_joined %>% 
-  select(-new_id)
 
 #check that row and column names are equal
 all(rownames(metadata_joined) == colnames(filtered_gene_count))
@@ -70,7 +68,7 @@ filtered_gene_count_pblo <- filtered_gene_count[,rownames(metadata_joined_pblo)]
 ruv_norm_counts_pblo <- ruv_norm_counts [,rownames(metadata_joined_pblo)]
 
 ######################### Design Matrices ###############################
-full_design <- ~vape_6mo_lab + sex_lab + age + ruv_k1 + ruv_k2 
+full_design <- ~ sex_lab + age + ruv_k1 + ruv_k2 + vape_6mo_lab
 
 vape_only_reduced <- ~ sex_lab + age + ruv_k1 + ruv_k2
 
@@ -97,7 +95,7 @@ run_deseq_lrt <- function(count_data, col_data, full_mod, reduced_mod) {
 #DESeq Results table
 format_results <- function(deseq_run, annotation) {
   #Pull out resultsand sort by padj and pval
-  deseq_res <- DESeq2::results(deseq_run, tidy = T, alpha = 0.05) %>% 
+  deseq_res <- DESeq2::results(deseq_run, tidy = T, alpha = 0.05, name = "vape_6mo_lab_vaped_vs_not_vaped") %>% 
     arrange(padj, pvalue) %>% 
     as_tibble() %>% 
     left_join(.,annotation, by = 'row') %>% 
@@ -220,7 +218,7 @@ vape_de_pblo <- run_deseq_lrt(count_data = filtered_gene_count_pblo,
 vape_res_pblo <- format_results(vape_de_pblo, gene_annotations)
 
 #Write out results
-#write_csv(vape_res_pblo, "DataProcessed/de_pueblo_sensitivity/vape_res_pblo_2022_06_13.csv")
+write_csv(vape_res_pblo, "DataProcessed/rna_seq/differential_expression/pueblo_sensitivity/vape_res_pblo_2022_10_21.csv")
 
 ######################### Filter for log-fold change (check) ###############################
 

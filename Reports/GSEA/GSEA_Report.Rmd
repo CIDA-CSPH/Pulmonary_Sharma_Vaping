@@ -18,7 +18,9 @@ output:
     toc_float: yes
     code_folding: hide
 bibliography: sharma_vape.bibtex
-csl: https://raw.githubusercontent.com/citation-style-language/styles/d8423d84cd58eeb4f1e2c07d2b4102791d95b8f6/apa.csl
+csl: https://raw.githubusercontent.com/citation-style-language/styles/master/nature.csl
+notes-after-punctuation: false
+link-citations: yes
 ---
 
 ```{r, echo=FALSE, out.width='70%', fig.show='hold'}
@@ -57,7 +59,7 @@ The purpose of this report is to identify differentially enriched biological pat
 
 # Methods
 
-GSEA requires the input of both a ranked list of genes and a list of biological pathways with their associated genes. For ease of comparison with various pathways, genes were mapped from ENSEMBL ID's to ENTREZ (NCBI) ID's. All GSEA analysis was conducted using the R package `fGSEA` ver. `r package.version("fGSEA")`.
+GSEA requires the input of both a ranked list of genes and a list of biological pathways with their associated genes. For ease of comparison with various pathways, genes were mapped from ENSEMBL IDs to ENTREZ (NCBI) IDs. GSEA analysis was conducted using the R package `fGSEA` ver. `r package.version("fGSEA")`.
 
 **Ranks**\
 The genes for this analysis arise from the differential expression analysis (see 'teen_vape_DE_report', 'de_pueblo_sensitivity', 'sample_12_sensitivity_report'). A filter for $|\log_2(FC)| > 2$ was applied as in previous sensitivity analyses. Ranks were calculated as:
@@ -75,23 +77,25 @@ We completed GSEA for three different pathway collections:
 
 All pathways were retrieved from Ensembl (ver. 106) using `biomaRt` ver. `r package.version("biomaRt")` [@cunningham2021].
 
-Only pathways with $\ge 2$ ENTREZ genes were considered for GSEA. After the initial analysis, we determined redundant pathways using the function `collapsePathways` from `fGSEA` [@korotkevich2016]. This report refers to non-redundant pathways as 'independent' pathways throughout the report. It should be noted that this terminology refers only to the idea that some gene-sets are represented in multiple pathways. In this case, independence does **not** refer to biological relationships between pathways.
+Only pathways with 2 or more ENTREZ genes were considered for GSEA. After the initial analysis, we determined redundant pathways using the function `collapsePathways` from `fGSEA` [@korotkevich2016]. This report refers to non-redundant pathways as 'independent' pathways throughout the report. It should be noted that this terminology refers only to the idea that some gene-sets are represented in multiple pathways. In this case, independence does **not** refer to biological relationships between pathways, but a statistical determination.
 
-Some definitions specific to these results provided by @subramanian2005 are as follows:
+Some definitions specific to these results provided by Subramanian, 2005 @subramanian2005 are as follows:
 
 -   [Enrichment Score (ES)]{.underline}: the degree that the gene set for the pathway is over-represented
 
 -   [Normalized Enrichment Score (NES)]{.underline}: the enrichment score normalized to the mean enrichment of random samples of the same size. This value allows for comparisons among pathways.
 
+-   [Leading Edge]{.underline}: Genes that account for the gene set's enrichment signal
+
 -   [Size]{.underline}: number of genes in the 'leading edge'
 
--   [Leading Edge]{.underline}: Genes that account for the gene set's enrichment signal
+
 
 Results presented in this report have been simplified to include only the number of up-regulated and down-regulated genes. Specifics about leading edge genes and which are up- or down-regulated can be found in the supplementary documentation.
 
 # Results
 
-4228 Ensembl genes mapped to 3690 ENTREZ genes with 12.8% failing to map. All 3690 ENTREZ genes were included in GSEA.
+555 Ensembl genes mapped to 469 ENTREZ genes with 17% failing to map. All 469 ENTREZ genes were included in GSEA.
 
 *Definitions*
 
@@ -108,6 +112,14 @@ Results presented in this report have been simplified to include only the number
 kegg_ind <- read_csv(here("DataProcessed/gsea/kegg_results_2022_10_06.csv"))
 react_ind <- read_csv(here("DataProcessed/gsea/react_results_2022_10_06.csv"))
 go_ind <- read_csv(here("DataProcessed/gsea/go_results_2022_10_06.csv"))
+
+#Read in un-corrected results to find differences
+old_kegg <- read_csv(here("DataProcessed/gsea/kegg_results_2022_07_05.csv"))
+old_react <- read_csv(here("DataProcessed/gsea/react_results_2022_07_05.csv"))
+old_go <- read_csv(here("DataProcessed/gsea/go_results_2022_07_05.csv"))
+
+
+
 
 #Summary table
 get_paths_res <- function(res_ind) {
@@ -140,30 +152,54 @@ colnames(paths_res) <- c("Paths Tested",  "Genes Matched", "Independent Pathways
 paths_res %>% kablize()
 ```
 
-The remaining results are specific to each pathway collection. Only the top 10 pathways (determined by FDR) are presented. Full results can be found in the supplementary documentation.
+The remaining results are specific to each pathway collection. Only the top 10 pathways (determined by FDR) are presented here. Full results can be found in the supplementary csv files (e.g. "go_full_res_2022_XX_XX).
 
 ## KEGG
 
 ```{r fig.width=10}
-format_tab <- function(res_ind) {
+format_tab <- function(res_ind, n = 10) {
   
   res_ind <- res_ind %>% 
     arrange(padj, pval)
   
   res_ind %>% 
-    dplyr::select(-c(leadingEdge, positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
+    dplyr::select(-c(leadingEdge, leadingEdge_symbol, positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
     dplyr::mutate(ES = round(ES, 2),
                   NES = round(NES, 2),
                   pval = if_else(pval < 0.001, '<0.001', as.character(round(pval, 3))),
                   padj = if_else(padj < 0.001, '<0.001', as.character(round(padj, 3))),
                   independent_path = if_else(is.na(independent_path), "Ind", independent_path)) %>%
     dplyr::rename("Dependent Pathway" = pathway,
-                  "Independent Pathway" = independent_path,
+                  "Idependent Pathway" = independent_path,
+                  "p-value" = pval,
                   FDR = padj,
-                  "Up-Regulated Genes" = positive_length,
-                  "Down-Regulated Genes" = negative_length) %>% 
+                  "No. Up-Regulated Genes" = positive_length,
+                  "No. Down-Regulated Genes" = negative_length) %>% 
     
-    .[1:10,] %>% 
+    .[1:n,] %>% 
+    kablize()
+}
+
+format_tab_ont <- function(res_ind, n = 10) {
+  
+  res_ind <- res_ind %>% 
+    arrange(padj, pval)
+  
+  res_ind %>% 
+    dplyr::select(-c(leadingEdge, leadingEdge_symbol, positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
+    dplyr::mutate(ES = round(ES, 2),
+                  NES = round(NES, 2),
+                  pval = if_else(pval < 0.001, '<0.001', as.character(round(pval, 3))),
+                  padj = if_else(padj < 0.001, '<0.001', as.character(round(padj, 3))),
+                  independent_path = if_else(is.na(independent_path), "Ind", independent_path)) %>%
+    dplyr::rename("Dependent Ontology" = pathway,
+                  "Idependent Ontology" = independent_path,
+                  "p-value" = pval,
+                  FDR = padj,
+                  "No. Up-Regulated Genes" = positive_length,
+                  "No. Down-Regulated Genes" = negative_length) %>% 
+    
+    .[1:n,] %>% 
     kablize()
 }
 #Fix independent Pathways
@@ -183,12 +219,31 @@ format_tab(react_ind)
 ## GO
 
 ```{r}
-format_tab(go_ind)
+format_tab_ont(go_ind)
 ```
 
 # Conclusion
 
-A pattern in the results is that genes within a particular pathway are all regulated in the same direction (either all up- or all down-regulated). This relationship is expected. Leading edge genes are the genes from the gene set which appear in the ranked list at or before the point where the enrichment score reaches its maximum deviation from 0 (i.e. the enrichment score reported in the table above) [@subramanian2005]. Those genes will tend to cluster at one side. Pathways with reference to both cilium and the cornified envelope are recurrent in both the Reactome and GO collections. These along with some of the other pathways with FDR \< 0.05 are worthy of further investigation.
+A pattern in the results is that genes within a particular pathway are all regulated in the same direction (either all up- or all down-regulated). This relationship is expected. Leading edge genes are the genes from the gene set which appear in the ranked list at or before the point where the enrichment score reaches its maximum deviation from 0 (i.e. the enrichment score reported in the table above) [@subramanian2005]. Those genes will tend to cluster at one side. Pathways with reference to both immune function and cilia are recurrent in both the Reactome and GO collections. These along with some of the other pathways with FDR \< 0.05 are worthy of further investigation.  
+
+**UPDATE (10/11/2022)**  
+Problems were encountered with both mis-labeling of sex and an incorrect return of estimates. Previous versions of this report were based on estimates for one of the RUVr variables. This report is correctly based on the vape status variable. The following are the pathways which **are no longer** significant from the previous report to this report. The tables below reflect the results from this report and not the previous (i.e the p-values are from the most current version of the analysis).
+
+## Reactome
+```{r results='asis'}
+react_ind %>%
+  filter(padj > 0.05) %>% 
+  filter(pathway %in% old_react[old_react$padj < 0.05, ]$pathway) %>% format_tab(n = 2)
+
+
+```
+
+## GO
+```{r}
+go_ind %>%
+  filter(padj > 0.05) %>% 
+  filter(pathway %in% old_go[old_go$padj < 0.05, ]$pathway) %>% drop_na(pathway) %>% format_tab(n = 9)
+```
 
 # References
 

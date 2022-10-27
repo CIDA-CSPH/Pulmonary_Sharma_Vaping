@@ -8,12 +8,10 @@ library(janitor)
 
 
 #read in raw gene counts
-raw_gene_count <- read_tsv(file = here("DataRaw/RNA_Seq/gene_counts_choo.txt"), col_names = T)
-
+raw_gene_count <- read.table(file = here("DataRaw/RNA_Seq/gene_counts_choo.txt"), row.names = 1, header = T) 
 
 #remove all genes with 0 counts in 75% or more of samples
-filter_0_.75_count <- raw_gene_count %>% 
-  select(-Feature) %>% 
+filter_0_.75_count <- raw_gene_count %>%
   apply(., 1, function(x) sum(x == 0) >= 49*.75)
 
 #True if # of cells with 0's >= 75% of samples
@@ -22,44 +20,29 @@ zero_count_.75_filtered <- raw_gene_count[!filter_0_.75_count,]
 
 #remove all genes with range >= 100
 filter_range_100 <- zero_count_.75_filtered %>% 
-  select(-Feature) %>% 
   apply(.,1, function(x) (max(x) - min(x)) >= 100)
+
 #True if range of read counts across all samples are >= 100
 #Keep if TRUE. Want to remove genes with low variation across samples
 filtered_gene_count <- zero_count_.75_filtered[filter_range_100,]
-
-#convert gene count matrix
-filtered_gene_count <- as.data.frame(filtered_gene_count)
-rownames(filtered_gene_count) <- filtered_gene_count[,1]
-filtered_gene_count <- filtered_gene_count[,-1]
 
 #create a list of genes
 genes <- rownames(filtered_gene_count)
 
 #Load metadata
-id_relate <- read_tsv(file = here("DataRaw/subject_ids/20201216_coreID_to_PID.txt"), col_names = T) %>% clean_names()
-metadata_unjoined <- read_csv(file = here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
+metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv")))
 
-
-#Join metadata
-metadata_joined <- id_relate %>% 
-  mutate(new_id = str_pad(new_id, 2, "left", "0") %>% paste0("Sample", .)) %>% 
-  left_join(metadata_unjoined, by = "sid") %>% 
-  filter(new_id %in% names(filtered_gene_count)) %>% 
-  as.data.frame()
-
-#Filter out subjects missing vape status
 metadata_joined <- metadata_joined %>% 
-  filter(!is.na(vape_6mo_lab))
+  drop_na(rna_id, vape_6mo_lab) %>% 
+  filter(rna_id != "Sample35")
 
 #Make sure the count data matches
-filtered_gene_count <- filtered_gene_count[,metadata_joined$new_id]
+filtered_gene_count <- filtered_gene_count[,names(filtered_gene_count) %in% metadata_joined$rna_id]
 
 filtered_gene_count_write <- filtered_gene_count %>% 
-  dplyr::mutate(Feature = base::rownames(filtered_gene_count)) %>% 
-  dplyr::select(Feature, everything())
+  rownames_to_column(var = "Feature")
 
-#write_csv(filtered_gene_count_write, file = here("DataProcessed/filtered_gene_count_2022_05_04.csv"))
+#write_csv(filtered_gene_count_write, file = here("DataProcessed/filtered_gene_count_2022_10_13.csv"))
 
 ##Prepare for DESeq2
 #Set up factors properly
@@ -86,26 +69,39 @@ ruv_prep <- newSeqExpressionSet(as.matrix(filtered_gene_count),
                                    phenoData = data.frame(vape_status, 
                                                           male, 
                                                           age, 
-                                                          row.names = metadata_joined$new_id))
+                                                          row.names = metadata_joined$rna_id))
 
 
 #Read in residuals matrix (See "03_gene_filter_and_ruv_edgeR.R" for more information on calculation)
-first_pass_residuls <- as.matrix(read_csv(here("DataProcessed/rna_seq/ruv/first_pass_residuals_edgeR_2022_10_06.csv")))
-rownames(first_pass_residuls) <- genes
-colnames(first_pass_residuls) <- metadata_joined$new_id
+#Get the residuals matrix
+#Design Matrix
+design <- model.matrix(~ vape_status + male + age, data = pData(ruv_prep))
+
+#get library size for each sample
+ruv_counts <- DGEList(counts = counts(ruv_prep), group = vape_status)
+
+#get commen negative binomial dispersion factor
+ruv_counts <- estimateGLMCommonDisp(ruv_counts, design = design)
+
+#fit log-linear negative binomial generalized model to the read counts for each gene
+first_pass <- glmFit(ruv_counts, design = design)
+
+#get the residuals from that model
+first_pass_residuls <- residuals(first_pass, type="deviance")
+
+rownames(first_pass_residuls) <- rownames(filtered_gene_count)
+colnames(first_pass_residuls) <- colnames(filtered_gene_count)
 
 ## Run RUVr with k = 2
 ruv_k2 <- RUVr(ruv_prep, cIdx = genes, k = 2, residuals = first_pass_residuls)
 
 #write out needed results
 ruv_k2_norm_counts <- as.data.frame(normCounts(ruv_k2)) %>% 
-  mutate(gene = rownames(.)) %>% 
-  select(gene, everything())
+  rownames_to_column(var = "Feature")
 
-# write_csv(ruv_k2_norm_counts, file = here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_05_06.csv"))
+#write_csv(ruv_k2_norm_counts, file = here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_10_13.csv"))
 
 ruv_k2_write <- pData(ruv_k2) %>% 
-  mutate(new_id = rownames(.)) %>% 
-  select(new_id, everything())
+  rownames_to_column(var = "rna_id")
 
-#write_csv(ruv_k2_write, file = "DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_10_04.csv")
+#write_csv(ruv_k2_write, file = "DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_10_13.csv")

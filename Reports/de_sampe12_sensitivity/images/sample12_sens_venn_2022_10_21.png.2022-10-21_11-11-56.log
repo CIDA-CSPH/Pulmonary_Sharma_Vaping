@@ -1,0 +1,15 @@
+INFO [2022-10-21 11:11:56] $x
+INFO [2022-10-21 11:11:56] list(modA_sig_genes, modB_sig_genes)
+INFO [2022-10-21 11:11:56] 
+INFO [2022-10-21 11:11:56] $category.names
+INFO [2022-10-21 11:11:56] c("Model A", "Model B")
+INFO [2022-10-21 11:11:56] 
+INFO [2022-10-21 11:11:56] $filename
+INFO [2022-10-21 11:11:56] here("Reports/de_sampe12_sensitivity/images/sample12_sens_venn_2022_10_21.png")
+INFO [2022-10-21 11:11:56] 
+INFO [2022-10-21 11:11:56] $lwd
+INFO [2022-10-21 11:11:56] [1] 2
+INFO [2022-10-21 11:11:56] 
+INFO [2022-10-21 11:11:56] $fill
+INFO [2022-10-21 11:11:56] c(venn_color[1], venn_color[3])
+INFO [2022-10-21 11:11:56] 

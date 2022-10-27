@@ -17,7 +17,7 @@ format_num <- function(number, digits = 0, format = "f") {
   formatC(number, digits = digits, format = format, big.mark = ",")
 }
 ################## Read in results #################
-vape_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
+vape_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/archive/full_vape_res_2022_10_06.csv"))
 
 #Fix Ensemble ID's  and join with symbols
 vape_res$ensg <- gsub("\\..*", "", vape_res$ensg)
@@ -179,15 +179,25 @@ format_res <- function(result, path, ranks) {
   
   leadingEdge_unlist <- NULL
   
+  leadingEdge_symbol <- NULL
+  
   for (i in 1:nrow(result)) {
     #Get the entrez gene list for the pathway
     entrez_temp <- unique(unlist(result[i,"leadingEdge"]))
     #Subset the diff exp results 
     vape_res_temp <- vape_res[vape_res$ENTREZID %in% entrez_temp,]
+    
+    #All genes_temp
+    all_genes_temp <- vape_res_temp[,c('ENTREZID','gene_name')]
+    
     #Figure out if log2 FC is + or -
     positive_genes_temp <- vape_res_temp[vape_res_temp$log2FoldChange > 0, c('ENTREZID','gene_name')]
     
     negative_genes_temp <- vape_res_temp[vape_res_temp$log2FoldChange < 0, c('ENTREZID','gene_name')]
+    
+    #All Genes
+    leadingEdge_symbol <- append(leadingEdge_symbol, paste0(all_genes_temp$gene_name, collapse = ', '))
+    
     #Positive Genes
     positive_entrez <- append(positive_entrez, paste0(positive_genes_temp$ENTREZID, collapse = ', '))
     
@@ -220,9 +230,11 @@ format_res <- function(result, path, ranks) {
   result[,'negative_length'] <- negative_length
   
   result[,'leadingEdge'] <- leadingEdge_unlist
+  
+  result[,'leadingEdge_symbol'] <- leadingEdge_symbol
 
   result <- result %>%
-    dplyr::select(pathway, independent_path, pval, padj, ES, NES, size, leadingEdge, 
+    dplyr::select(pathway, independent_path, pval, padj, ES, NES, size, leadingEdge, leadingEdge_symbol,
                   positive_entrez, positive_symbol, positive_length,
                   negative_entrez, negative_symbol, negative_length)
   return(result)}
@@ -292,7 +304,7 @@ format_tab <- function(res_ind) {
     arrange(padj, pval)
   
   res_ind %>% 
-    dplyr::select(-c(positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
+    dplyr::select(-c(leadingEdge, positive_entrez, positive_symbol, negative_entrez, negative_symbol)) %>% 
     dplyr::mutate(ES = round(ES, 2),
                   NES = round(NES, 2),
                   pval = if_else(pval < 0.001, format_num(pval, digits = 2, format = "e"), as.character(round(pval, 5))),
@@ -352,14 +364,14 @@ colnames(kegg_res_full) <- c("Pathway", "Independent Pathway", "leadingEdge", "g
 colnames(react_res_full) <- c("Pathway", "Independent Pathway", "leadingEdge", "gene_name", "log2FoldChange", "regulation", "gene_level_pval", "gene_level_fdr", "path_level_fdr")
 colnames(go_res_full) <- c("Pathway", "Independent Pathway", "leadingEdge", "gene_name", "log2FoldChange", "regulation", "gene_level_pval", "gene_level_fdr", "path_level_fdr")
 
-# #Write out kegg results 
-# list_of_datasets <- list("pathway_level" = kegg_res_supplement, "gene_level" = kegg_res_full)
-# writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea_res/kegg_full_res_2022_07_18.xlsx"))
-# 
-# #Write out react results 
-# list_of_datasets <- list("pathway_level" = react_res_supplement, "gene_level" = react_res_full)
-# writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea_res/react_full_res_2022_07_18.xlsx"))
-# 
-# #Write out go results 
-# list_of_datasets <- list("pathway_level" = go_res_suplement, "gene_level" = go_res_full)
-# writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea_res/go_full_res_2022_07_18.xlsx"))
+#Write out kegg results
+list_of_datasets <- list("pathway_level" = kegg_res_supplement, "gene_level" = kegg_res_full)
+writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea/kegg_full_res_2022_10_20.xlsx"))
+
+#Write out react results
+list_of_datasets <- list("pathway_level" = react_res_supplement, "gene_level" = react_res_full)
+writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea/react_full_res_2022_10_20.xlsx"))
+
+#Write out go results
+list_of_datasets <- list("pathway_level" = go_res_suplement, "gene_level" = go_res_full)
+writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea/go_full_res_2022_10_20.xlsx"))

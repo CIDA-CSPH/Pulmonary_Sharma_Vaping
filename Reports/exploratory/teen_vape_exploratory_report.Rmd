@@ -62,21 +62,27 @@ tab1_dat <- tab1_dat %>%
 
 # Background
 
-The data presented in this report are part of a study aimed to assess differential gene expression and methylation in vaping versus non-vaping LatinX youths in Pueblo and Denver, CO. Pulmonary function data were also obtained in order to better understand the impacts of vape use on pulmonary function. To assess differential gene expression and methylation, naso-epithelial swabs were obtained from each participating subject. Pulmonary function is assessed using PFTs (Pulmonary Function Tests) and Impulse Oscillometry (IOS).
+The data presented in this report are part of a study aimed to assess differential gene expression and methylation in vaping versus non-vaping youths in Pueblo and Denver, CO. Pulmonary function data were also obtained to better understand the impacts of vape use on pulmonary function. To assess differential gene expression and methylation, naso-epithelial swabs were obtained from each participating subject. Pulmonary function is assessed using PFTs (Pulmonary Function Tests) and Impulse Oscillometry (IOS).
 
 # Study Population
 
-This data set consists of samples taken from 51 people ages 12-17 yrs from the Pueblo, Denver, and Aurora, CO areas. Vape Status (did you vape in the last 6 months?) and ethnicity are self-reported.
+This data set consists of samples taken from 51 people ages 12-17 yrs from Pueblo, Denver, and Aurora, CO. 
 
 # Methods
 
-*All analyses performed using `r R.version$version.string`*
+All analyses performed using `r R.version$version.string`
 
 ## Clinical Data Pocessing
 
 ### *Vape Status*
 
-Subjects are dichotomized to those that used a vaping device in the last 6 months and those who have not based on the variables *ever_vape*, *vape_days*, and *last_vape*. This variable will be referred to as *Vape Status* throughout this report. One participant (SID = 111) reported that they had used a vaping device 5 out of the last 30 days, but did not respond to *last_vape*. That participant is recorded as *Vaped* in this analysis.
+Vape status is self-reported based on three questions. 
+
+1. "Have you ever vaped?" 
+1. "How many times have you vaped in the last 30 days?"
+1. "When was the last time you used a vape divice?" 
+
+These three questions were used to construct a dichotomous variable which defines subjects who have vaped in the last 6 months. This variable will be referred to as *Vape Status*. One participant (SID = 111) reported that they had used a vaping device 5 out of the last 30 days, but did not respond to *last_vape*. That participant is recorded as *Vaped* in this analysis.
 
 ### *Sex*
 
@@ -105,10 +111,7 @@ The following analyses used the function RUVr from the R package RUVSeq. RUVr us
 
 $$raw \ read \ count \sim \beta_0 + \beta_1 * vape \ status \ + \beta_2 *male \ + \beta_3 * age$$
 
-RUVr will be performed with k = 1 through k = 2 factors and the best k for factor analysis will be determined visually using an elbow plot, RLE plots, and dendrograms. Previous analyses used R package DESeq2 to fit the first-pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
-
-*Transformations*\
-A variance stabilizing transformation (VST) was applied in previous analyses. This analysis will use the same transformation, but will apply the transformation only after normalization.
+RUVr will be performed with k = 1 and k = 2 factors and the best k for factor analysis will be determined visually using an elbow plot, RLE plots, and dendrograms. Previous analyses used R package DESeq2 to fit the first pass GLM. This analysis will use edgeR due to its reference in the literature for the RUVr procedure mentioned above.
 
 # Results
 
@@ -241,7 +244,7 @@ x20_hist <- tab1_dat %>%
 
 ### Figure 1: Population Demographics
 
-Figure 1 visualizes the demographic information presented in Table 1. The majority of vaping subjects were recruited in Pueblo (92%) and identified as LatinX (85%). `r format_num(p_male)`% of subjects were male as confirmed from the available methylation data.
+Figure 1 visualizes the demographic information presented in Table 1. Most vaping subjects were recruited in Pueblo (92%) and identified as LatinX (85%). `r format_num(p_male)`% of subjects were male as confirmed from the available methylation data.
 
 ```{r Demographic Figure, include=T, fig.height=6, fig.width=9}
 #Demographic Figures
@@ -259,7 +262,7 @@ ggarrange(hist_fev1_fvc, ggarrange(r5_box, x20_box, ncol = 2, nrow = 1, legend =
 
   
 ### Figure 3: Correlation Matrix  
-Figure 3 identifies correlation patterns in the clinical variables of interest. To test for correlation, a contingency table was made for each comparison of variables. because some contingency tables contained cells with <5 subjects, a Fisher's Exact test was used for all tests. 
+Figure 3 identifies correlation patterns in the clinical variables of interest. To test for correlation, a contingency table was made for each comparison of variables. Because some contingency tables contained cells with <5 subjects, a Fisher's Exact test was used for all comparisons. 
 ```{r}
 source(here("Code/01_variable_correlation.R"), local = knitr::knit_global())
 
@@ -275,7 +278,7 @@ age_report_tab
 
 ## Gene-Count Processing Results  
 
-After merging clinical metadata with gene-count data, there were **n = 47** samples present. From the clinical metadata, SID = 105, 137, and 103 are missing genetic data. Sample 23 (SID = 144) was also removed due to missing vape status.  
+After merging clinical and gene-count data, there were **n = 47** samples present. From the clinical metadata, SID = 105, 137, and 103 are missing genetic data. Sample 23 (SID = 144) was also removed due to missing vape status.  
 
 
 ### Table 2: Comparison of Gene Filtering Parameters
@@ -296,9 +299,9 @@ The figure below is used to visually assess how many genes are removed across cu
 range_cutoff
 ```
 
-After reviewing the comparison of filters, it appears that filtering parameters presented by the creators of RUVSeq may be overly conservative for this application. Analyses will proceed using the same filters as previous analyses (filters 1 & 2 from table 2). The first filter will remove genes with 0 reads in more than 75% of samples, and the second will remove genes with low variation (range of reads < 100) that may be considered "house-keeping" genes. This analysis will include a total of **n = 16,860** genes. 
+After reviewing filter comparisons, it appears that filtering parameters presented by the creators of RUVSeq may be overly conservative for this application. Analyses will proceed using the same filters as previous analyses (filters 1 & 2 from table 2). The first filter will remove genes with 0 reads in more than 75% of samples, and the second will remove genes with low variation (range of reads < 100) that may be considered "house-keeping" genes. This analysis will include a total of **n = 16,860** genes. 
 
-### Figure 5: Relative Loge Expression and Principal Component Analysis Prior to RUV
+### Figure 5: Relative Log Expression and Principal Component Analysis Prior to RUV
 
 The following figure shows the Relative Log Expression (RLE) and Principal Component Analysis (PCA) of read counts for each sample without any prior transformations.
 
@@ -464,9 +467,16 @@ legend(x = "top", legend = c("Pueblo", "Denver", "Aurora"), fill = c(center_colo
 
 Using the figures above (with special attention towards Figure 10), It seems appropriate to **keep** sample 12 and use k = 2 factors for RUVr normalization. 
 
+# Conclusion
+
+After review of the demographic composition of the participants in this study and the distribution of read counts across subjects, there are two key takeaways. The first is that there is a class imbalance when stratifying the study population by both vape status and recruitment center. Almost all vaping subjects were recruited from the Pueblo center, and 0 were recruited from the Aurora center. The implication of this class imbalance is that results may not generalize well to other populations. In order to assess the presence and direction of potential bias, a sensitivity analysis will be conducted for the recruitment center variable in which we look at the results for Pueblo subjects alone. 
+
+The other key takeaway is that Sample 12 is of particular concern as an outlier with regard to sample quality and read count. The inclusion of k = 2 RUVr factors were able to account for the outlying nature of this sample, but a separate sensitivity analysis will still be conducted as a gut-check to ensure that Sample 12 does not significantly bias our model. 
+
+
 # Notes
 
-- Between this report and it's previous version ("teen_vape_exploratory_report_2022_04_15"), the variable LatinX was included in the model as opposed to the variable Age. This report corrects that mistake. Visually, it seems to make little differences in the figures used to select K.  
+Between this report and it's previous version ("teen_vape_exploratory_report_2022_04_15"), the variable LatinX was included in the model as opposed to the variable Age. This report corrects that mistake. Visually, it seems to make little differences in the figures used to select K.  
 
 <!-- footer -->
 

@@ -255,4 +255,4 @@ vape_plots_ruv_no12 <- tcount_boxplot(tcounts = vape_ruv_tidy_no12, mod = "Vape 
 
 
 #Write out results
-# write_csv(vape_res_no12, here("DataProcessed/de_sample12_sensitivity/Vape_Results_no12_2022_05_11.csv"))
+write_csv(vape_res_no12, here("DataProcessed/rna_seq/differential_expression/sample12_sensitivity/Vape_Results_no12_2022_10_11.csv"))

@@ -1,39 +1,30 @@
 ######################### Load Libraries ###############################
-library(ggpubr)
 library(tidyverse)
 library(here)
 library(DESeq2)
-library(pcaExplorer)
 library(RColorBrewer)
 library(kableExtra)
 
 ######################### Read in files so that they are unaltered and join ###############################
-filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_05_04.csv")))
-metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/metadata_joined_rnaseq_04_20_2022.csv")))
-ruv_factor_dat <- read_csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_04_20.csv"))
-ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
+filtered_gene_count <- read.csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_10_13.csv"), 
+                                row.names = 1, header = T) 
+metadata_joined <- read.csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv"))
+ruv_factor_dat <- read.csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_10_13.csv")) %>% 
+  select(c(rna_id, W_1, W_2))
+ruv_norm_counts <- read.csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_10_13.csv"), 
+                            row.names = 1, header = T)
 gene_annotations <- read_tsv(here("DataRaw/RNA_Seq/gencode_annotations_choo.txt"))
 
-#fix rownames of filtered gene count and ruv_counts
-rownames(filtered_gene_count) <- filtered_gene_count$Feature
-filtered_gene_count <- filtered_gene_count %>% 
-  dplyr::select(-Feature)
-
+#only metadata with rna_seq dat
+metadata_joined <- metadata_joined %>% 
+  filter(rna_id %in% names(filtered_gene_count))
+  
 #join metadata with ruv factor data
-metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = "new_id", copy = T) %>% 
-  select(-c(vape_status, age.y, male)) 
-metadata_joined <- metadata_joined %>%
-  mutate(age = age.x, ruv_k1 = W_1, ruv_k2 = W_2) %>% 
-  select(-c(age.x, W_1, W_2))
+metadata_joined <- left_join(metadata_joined, ruv_factor_dat, by = "rna_id") %>% 
+  dplyr::rename("ruv_k1" = W_1,
+                "ruv_k2" = W_2) 
 
-#fix gene annotations
-gene_annotations <- gene_annotations %>% 
-  dplyr::rename(row = ENSG)
-
-#fix ruv colnames
-rownames(ruv_norm_counts) <- ruv_norm_counts$gene
-ruv_norm_counts <- ruv_norm_counts %>% 
-  select(-gene)
+rownames(metadata_joined) <- metadata_joined$rna_id
 
 ######################### Prepare Metadata ###############################
 #Set factor levels
@@ -47,23 +38,14 @@ metadata_joined$recruitment_center <- factor(metadata_joined$recruitment_center,
 #Scaling Age
 metadata_joined$age <- scale(metadata_joined$age)
 
-#Make Sample ID into row names
-rownames(metadata_joined) <- metadata_joined$new_id
-
-metadata_joined <- metadata_joined %>% 
-  select(-new_id)
-
-#check that row and column names are equal
-all(rownames(metadata_joined) == colnames(filtered_gene_count))
-
 ######################### Design Matrices ###############################
-full_design <- ~vape_6mo_lab + sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 
+full_design <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 + vape_6mo_lab 
 
-vape_only_reduced <- ~vape_6mo_lab + sex_lab + age + ruv_k1 + ruv_k2
+test_center <- ~ sex_lab + age + ruv_k1 + ruv_k2 + vape_6mo_lab
 
-center_only_reduced <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2
+test_vape <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2
 
-reduced_design <- ~sex_lab + age + ruv_k1 + ruv_k2 
+test_vape_center <- ~sex_lab + age + ruv_k1 + ruv_k2 
 ######################### Required Functions ###############################
 # format numbers
 format_num <- function(number, digits = 0) {
@@ -78,7 +60,7 @@ run_deseq_lrt <- function(count_data, col_data, full_mod, reduced_mod) {
                                          colData = col_data,
                                          design = full_mod)
   #Run DESeq
-  deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod, )
+  deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod)
   
   #Return the results
   return(deseq_run)
@@ -87,10 +69,10 @@ run_deseq_lrt <- function(count_data, col_data, full_mod, reduced_mod) {
 #DESeq Results table
 format_results <- function(deseq_run, annotation) {
   #Pull out resultsand sort by padj and pval
-  deseq_res <- DESeq2::results(deseq_run, tidy = T, alpha = 0.05) %>% 
+  deseq_res <- DESeq2::results(deseq_run, tidy = T, alpha = 0.05, name = "vape_6mo_lab_vaped_vs_not_vaped") %>% 
     arrange(padj, pvalue) %>% 
-    tbl_df() %>% 
-    left_join(.,annotation, by = 'row') %>% 
+    as_tibble() %>% 
+    left_join(.,annotation, by = c('row' = 'ENSG')) %>% 
     select(row, symbol, gene_type, everything()) %>% 
     dplyr::rename(ensg = row,
                   gene_name = symbol)
@@ -108,7 +90,7 @@ p_hist <- function(de_results) {
 #tidy results for plotting (DESEQ-Normalized)
 de_res_tidy <- function(run_de, de_res, col_data) {
   #Get top 4 genes of interest
-  genes_of_interest <- de_res$row
+  genes_of_interest <- de_res$ensg[1:100]
   
   #Normalize Counts
   run_de <- estimateSizeFactors(run_de)
@@ -118,10 +100,11 @@ de_res_tidy <- function(run_de, de_res, col_data) {
                                 normalized=TRUE)+.5))) %>%
     merge(col_data, ., by="row.names") %>%
     gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
-  #add symbol name
-  gene_symbols <- gene_annotations[gene_annotations$gene %in% genes_of_interest,]
   
-  norm_counts <- left_join(norm_counts, gene_symbols, by = "gene") 
+  #add symbol name
+  gene_symbols <- gene_annotations[gene_annotations$ENSG %in% genes_of_interest,]
+  
+  norm_counts <- left_join(norm_counts, gene_symbols, by = c("gene" = "ENSG")) 
   
   return(norm_counts)
 }
@@ -129,15 +112,17 @@ de_res_tidy <- function(run_de, de_res, col_data) {
 #tidy results for plotting (RUV-Normalized)
 ruv_res_tidy <- function(ruv_count_dat, de_res, col_data, annotation) {
   #Get top 4 genes of interest
-  genes_of_interest <- de_res$ensg[1:4]
+  genes_of_interest <- de_res$ensg[1:100]
   
   #Join and tidy
   norm_counts<- t(log10((ruv_count_dat[genes_of_interest,] +.5))) %>%
     merge(col_data, ., by="row.names") %>%
     gather(gene, expression, (ncol(.)-length(genes_of_interest) + 1):ncol(.))
   
+  print(colnames(norm_counts))
+  print(colnames(annotation))
   #join back with gene name
-  norm_counts <- left_join(norm_counts, annotation, by = c("gene" = "row"))
+  norm_counts <- left_join(norm_counts, annotation, by = c("gene" = "ENSG"))
   
   return(norm_counts)
 }
@@ -201,18 +186,18 @@ sig_gene_count <- function(de_res) {
 vape_center_de <- run_deseq_lrt(count_data = filtered_gene_count, 
                                 col_data = metadata_joined,
                                 full_mod = full_design,
-                                reduced_mod = reduced_design) 
+                                reduced_mod = test_vape_center) 
 #Vape Only
 vape_de <- run_deseq_lrt(count_data = filtered_gene_count, 
                          col_data = metadata_joined,
                          full_mod = full_design,
-                         reduced_mod = center_only_reduced)
+                         reduced_mod = test_vape)
 
 #Center Only
 center_de <- run_deseq_lrt(count_data = filtered_gene_count, 
                            col_data = metadata_joined,
                            full_mod = full_design,
-                           reduced_mod = vape_only_reduced)
+                           reduced_mod = test_center)
 
 ######################### Get Formatted Results ###############################
 vape_center_res <- format_results(vape_center_de, gene_annotations)
@@ -222,9 +207,9 @@ vape_res <- format_results(vape_de, gene_annotations)
 center_res <- format_results(center_de, gene_annotations)
 
 #Write out results
-# write_csv(vape_center_res, file = here("DataProcessed/de_output/vape_center_res_2022_05_01.csv"))
-# write_csv(vape_res, file = here("DataProcessed/de_full/full_vape_res_2022_05_01.csv"))
-# write_csv(center_res, file = here("DataProcessed/de_output/center_res_2022_05_01.csv"))
+write_csv(vape_center_res, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/vape_center_res_2022_10_13.csv"))
+write_csv(vape_res, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_13.csv"))
+write_csv(center_res, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/center_res_2022_10_13.csv"))
 
 ######################### P-Value Histograms ###############################
 #Vape and Center
@@ -262,7 +247,9 @@ center_de_tidy  <- de_res_tidy(de_res = center_res,
 ######################### Top Genes Tidy RUV-Norm Counts ###############################
 vape_center_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
                                      de_res = vape_center_res,
-                                     col_data = metadata_joined)
+                                     col_data = metadata_joined, 
+                                     annotation = gene_annotations)
+
 vape_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
                                    de_res = vape_res,
                                    col_data = metadata_joined,
@@ -271,12 +258,13 @@ vape_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
 
 center_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
                                 de_res = center_res,
-                                col_data = metadata_joined)
+                                col_data = metadata_joined,
+                                annotation = gene_annotations)
 
 #write out results
-# write_csv(vape_center_ruv_tidy, file = here("DataProcessed/de_output/vape_center_ruv_normcounts_2022_05_06.csv"))
-# write_csv(vape_ruv_tidy, file = here("DataProcessed/de_full/top100_vape_ruv_normcounts_2022_06_14.csv"))
-# write_csv(center_only_ruv_tidy, file = here("DataProcessed/de_output/center_ruv_normcounts_2022_05_06.csv"))
+write_csv(vape_center_ruv_tidy, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/vape_center_ruv_normcounts_2022_10_13.csv"))
+write_csv(vape_ruv_tidy, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/vape_ruv_normcounts_2022_10_13.csv"))
+write_csv(center_ruv_tidy, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/center_ruv_normcounts_2022_10_13.csv"))
 
 ######################### Top Gene Boxplots DE Counts ###############################
 #Set color pallettes to match

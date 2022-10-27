@@ -50,11 +50,11 @@ format_num <- function(number, digits = 0) {
 
 # Introduction
 
-The breakdown of study participants shows that 12 of the 13 (92%) of vapers recruited for this study were from the Pueblo recruitment center. Overall, 21 subjects (42%) were recruited at the Pueblo center. The purpose of this report is to look at an analysis of only the participants recruited from the Pueblo center and compare it to the overall model containing all study participants to assess differences in estimates and significant gene composition between the models. 
+The breakdown of study participants shows that 12 of the 13 (92%) vapers recruited for this study were from the Pueblo recruitment center. Overall, 21 subjects (42%) were recruited at the Pueblo center. We are concerned that this demographic imbalance could act as as a confounder or source of multicollinearity. The purpose of this report is to look at an analysis of only the participants recruited from the Pueblo center and compare it to the overall model containing all study participants to assess differences in estimates and significant gene composition between the models. 
 
 # Methods
 
-To assess the difference in model outputs, the following model was fit in DESeq2 ver. `r package.version("DESeq2")` with all of the recruited subjects and again with only the subjects from the Pueblo recruitment center. Likelihood Ratio Tests (LRTs) were implemented to test for gene significance and corrected with FDR $\le$ 0.05. For the purpose of this report, the model containing all subjects will be referred to as *Model A* and the model with only participants from the Pueblo recruitment center will be referred to as *Model P*.
+To assess the difference in model outputs, the following model was fit in DESeq2 with all the recruited subjects and again, but only with the subjects from the Pueblo recruitment center. Likelihood Ratio Tests (LRTs) were implemented to test for gene significance and corrected with FDR $\le$ 0.05. For the purpose of this report, the model containing all subjects will be referred to as *Model A* and the model with only participants from the Pueblo recruitment center will be referred to as *Model P*.
 
 $$Full \ Model \\ raw \ read \ count \sim vape \ status + recruitment \ center + sex + age + ruv_1 + ruv_2$$
 
@@ -76,8 +76,8 @@ To assess the difference in the models, the results will focus on genes with rel
 The top 100 genes determined by FDR were subset from Model A to compare to Model P. This comparison shows that the top 100 genes in Model A are identical to the top 100 genes in Model P. 
 ```{r fig.width=12}
 #############Read in results###################
-modA_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_05_01.csv"))
-modB_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/pueblo_sensitivity/vape_res_pblo_2022_06_13.csv"))
+modA_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_13.csv"))
+modB_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/pueblo_sensitivity/vape_res_pblo_2022_10_21.csv"))
 
 #############Join results and get top 100 genes###################
 AB_res <- left_join(modA_res, modB_res, by = c("ensg", "gene_name", "gene_type"), suffix = c(".modA", ".modB"))
@@ -106,22 +106,23 @@ AB_res_no_cutoff <- AB_res
 ```
 ### Figure 1: Total Significant Genes in Models A & B
 
-The top 100 significant genes in models A & P are identical both before and after the selected cutoff value (|Log~2~(Fold-Change)| > 2). A Venn Diagram of these would be trivial (a single circle), so Figure 2 shows the breakdown of the significant genes in Models A and P.  
+The top 100 significant genes in models A & P are identical both before and after the selected cutoff value (|Log~2~(Fold-Change)| > 2). A Venn Diagram of these would be trivial (a single circle), so Figure 2 shows the breakdown of the significant genes in Models A and P after applying the cutoff.  
 
 ```{r echo=FALSE}
-# # #############Venn Diagram##################
-# #Get significant pvals
-# pval_match <- AB_res %>%
-#   dplyr::mutate(modA_sig = if_else(FDR_A < 0.05 & FDR_B > 0.05, T,F),
-#                 modB_sig = if_else(FDR_B < 0.05 & FDR_A > 0.05, T,F),
-#                 modAB_sig = if_else(FDR_B < 0.05 & FDR_A < 0.05, T,F),
-#                 neither_sig = if_else(FDR_A > 0.05 & FDR_B > 0.05,T, F)) %>%
-#   dplyr::arrange(FDR_A)
-# 
-# #Get significant gene names for each model
-# modA_sig_genes <- pval_match[pval_match$FDR_A < 0.05,]$Gene
-# modB_sig_genes <- pval_match[pval_match$FDR_B < 0.05,]$Gene
-# 
+# #############Venn Diagram##################
+#Get significant pvals
+pval_match <- AB_res %>%
+  filter(abs(Estimate_A) > 2) %>% 
+  dplyr::mutate(modA_sig = if_else(FDR_A < 0.05 & FDR_B > 0.05, T,F),
+                modB_sig = if_else(FDR_B < 0.05 & FDR_A > 0.05, T,F),
+                modAB_sig = if_else(FDR_B < 0.05 & FDR_A < 0.05, T,F),
+                neither_sig = if_else(FDR_A > 0.05 & FDR_B > 0.05,T, F)) %>%
+  dplyr::arrange(FDR_A)
+
+#Get significant gene names for each model
+modA_sig_genes <- pval_match[pval_match$FDR_A < 0.05,]$Gene
+modB_sig_genes <- pval_match[pval_match$FDR_B < 0.05,]$Gene
+
 # #Set color palatte
 # venn_color <- brewer.pal(3,"Pastel2")
 # 
@@ -135,7 +136,7 @@ The top 100 significant genes in models A & P are identical both before and afte
 
 
 
-![](/Users/hawkjona/Library/CloudStorage/OneDrive-TheUniversityofColoradoDenver/CIDA/Sharma_Vape_Local/figures/venn_diagrams/pueblo_sens_venn.jpg){width=60%}  
+![](images/pueblo_sens_venn.jpeg){width="5in"}  
 
 
 ### Figure 2: Difference in Log~2~(Fold-Change) (Top 100 Genes)
@@ -195,14 +196,14 @@ top_100_genes_AB[1:10,] %>%
                 "Gene Name" = Gene_Name,
                 "Gene Type" = Gene_Type,
                 "Log~2~(FC) (Mod A)" = Estimate_A,
-                "Log~2~(FC) (Mod B)" = Estimate_B,
-                "Log~2~(FC) Difference (B - A)" = Estimate_Difference,
+                "Log~2~(FC) (Mod P)" = Estimate_B,
+                "Log~2~(FC) Difference (P - A)" = Estimate_Difference,
                 "Log~2~(FC) Difference (%)" = Estimate_P_Difference,
                 "FDR (Mod A)" = FDR_A,
-                "FDR (Mod B)" = FDR_B) %>%
+                "FDR (Mod P)" = FDR_B) %>%
   kablize(.,digits = 3)
 ```
-These results demonstrate that estimates increase when looking only at subjects from Pueblo. That effect does not make a large difference in the number of significant genes or the direction of their effect.  
+These results demonstrate that estimates systematically decrease when looking only at subjects from Pueblo. That effect does not make a large difference in the number of significant genes or the direction of their effect.  
 
 ### Figure 3: Difference in Log~2~(Fold-Change) (Top 2000 Genes)
 Figure 3 parallels Plot A in Figure 3, but includes the top 2000 genes to visualize this trend.
@@ -223,7 +224,7 @@ change_scatter <- top_1000 %>%
 change_scatter
 ```
 
-There is a small amount of variability present in the estimates; however, a majority of the estimates are clustered around the line representing equal estimates. 
+There is a small amount of variability present in the estimates; however, most of the estimates are clustered around the line representing equal estimates. 
 
 ### Figure 4: -log~10~(p-value) Model A vs. Model P
 
@@ -243,7 +244,7 @@ Excluding subjects that are not from Pueblo from the model additionally inflates
 
 # Conclusion
 
-When looking at only the top 100 genes as determined by FDR-adjusted P-values, all genes retain significance from Model A to Model P. From the series of visualizations presented in the report, excluding subjects from recruitment centers other than Pueblo decreases |Log~2~(Fold-Change)| estimates, but does not significantly change the composition of significantly expressed genes. Looking at at a larger subset of the top genes confirms that estimates are decreased overall when excluding subjects not recruited at the Pueblo center. Since excluding those samples does not change the composition or direction of |Log~2~(Fold-Change)| estimates, further analyses will include all (n = 47) subjects. 
+When looking at only the top 100 genes as determined by FDR-adjusted P-values, all genes retain significance from Model A to Model P. From the series of visualizations presented in the report, excluding subjects from recruitment centers other than Pueblo decreases Log~2~(Fold-Change) estimates, but does not significantly change the composition of significantly expressed genes. Looking at a larger subset of the top genes confirms that estimates are decreased overall when excluding subjects not recruited at the Pueblo center. Since excluding those samples does not change the composition or direction of Log~2~(Fold-Change) estimates, further analyses will include all (n = 47) subjects. 
 
  <!-- footer -->
 
