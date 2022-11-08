@@ -12,8 +12,6 @@ library(RColorBrewer)
 library(EDASeq)
 
 # Load in Required Data ---------------------------------------------------
-## targets to read in ---------------------------------------------------
-targets <- read_csv(here("DataProcessed/methylation/minfi_targets.csv"))
 
 ## other clinical metadata ---------------------------------------------------
 clin_metadata <- read_csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv"))
@@ -23,18 +21,16 @@ clin_metadata <- clin_metadata %>%
 
 
 ## M Values ----------------------------------------------------------------
-mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_final_2022_09_27.txt")) %>% as.data.frame()
-
-rownames(mvals) <- mvals$CpG_Site
-
+mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_final_2022_09_27.txt")) %>% 
+  column_to_rownames("CpG_Site")
+  
 ## Drop the NA Vaper
-M <- mvals %>% select(-CpG_Site, -targets$sentrix_name[is.na(targets$vape_6mo_lab)])
+M <- mvals[,names(mvals) %in% clin_metadata$sentrix_name]
 
 ### Make sure clinical metadata same arrangement as Mvals
 clin_metadata <- clin_metadata[match(names(M), clin_metadata$sentrix_name),]
-# Drop the NA Vaper From Targets-------------------------------------------------------
-targets <- targets %>% drop_na(vape_6mo_lab)
 
+all(names(M) == clin_metadata$sentrix_name)
 # setup the factors of interest
 vape_status <- factor(clin_metadata$vape_6mo_lab, levels = c("Did Not Vape in Last 6 Months", "Vaped in Last 6 Months"), labels = c(0,1))
 
@@ -42,10 +38,10 @@ sex <- factor(clin_metadata$sex_lab, levels = c("Female", "Male"), labels = c(0,
 
 age <- scale(clin_metadata$age, scale = T, center = F)
 
-center <- factor(clin_metadata$recruitment_center, levels = c("Aurora", "Pueblo", "CommCity/Denver")) #for plotting only
+center <- factor(clin_metadata$recruitment_center, levels = c("Pueblo", "Aurora", "CommCity/Denver")) #for plotting only
 
 #Design Matrix
-des <- model.matrix(~vape_status + sex + age)
+des <- model.matrix(~vape_status + sex + age + center)
 des
 
 # limma differential methylation analysis
@@ -63,7 +59,7 @@ ctl3 <- rownames(M) %in% rownames(topl1[topl1$adj.P.Val > 0.5,])
 table(ctl3)
 
 # Perform RUV adjustment and fit
-rfit5 <- RUVfit(Y = M, X = vape_status, Z = data.frame("sex" = sex, "age" = age), ctl = ctl3) # Stage 2 analysis
+rfit5 <- RUVfit(Y = M, X = vape_status, Z = data.frame("sex" = sex, "age" = age, "centerAurora" = des[,5], "centerCommCity/Denver" = des[,6]), ctl = ctl3) # Stage 2 analysis
 rfit6 <- RUVadj(Y = M, fit = rfit5)
 # Look at table of top results
 topRUV(rfit6)
@@ -71,10 +67,16 @@ topRUV(rfit6)
 Madj <- getAdj(M, rfit5)
 
 # Use RUV-4 in stage 2 of RUVm with k=1 and k=2
-rfit7 <- RUVfit(Y = M, X = vape_status, Z = data.frame("sex" = sex, "age" = age), ctl = ctl3,
+rfit7 <- RUVfit(Y = M, X = vape_status, Z = data.frame("sex" = sex, "age" = age, "centerAurora" = des[,5], "centerCommCity/Denver" = des[,6]), ctl = ctl3,
                 method = "ruv4", k=1) # Stage 2 with RUV-4, k=1
-rfit9 <- RUVfit(Y = M, X = vape_status, Z = data.frame("sex" = sex, "age" = age), ctl = ctl3,
-                method = "ruv4", k=2) # Stage 2 with RUV-4, k=1
+rfit9 <- RUVfit(Y = M, X = vape_status, Z = data.frame("sex" = sex, "age" = age, "centerAurora" = des[,5], "centerCommCity/Denver" = des[,6]), ctl = ctl3,
+                method = "ruv4", k=2) # Stage 2 with RUV-4, k=2
+
+#Join RUV factors to clinical metadata
+clin_metadata_2 <- cbind(clin_metadata, rfit9$W)
+
+write_csv(clin_metadata_2, here("DataProcessed/methylation/clin_metadata_w_ruv_center.csv"))
+
 # get adjusted values
 Madj1 <- getAdj(M, rfit7)
 Madj2 <- getAdj(M, rfit9)

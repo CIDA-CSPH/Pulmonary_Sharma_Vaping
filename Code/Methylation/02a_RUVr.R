@@ -59,17 +59,17 @@ elbow_plot
 
 
 clin_metadata <- clin_metadata[match(names(mvals), clin_metadata$sentrix_name),]
-# #Continue with K = 2
-# plan(multisession)
-# # Get the first pass residuals
-# # preruv_residuals <- 
-# #   future_apply(mvals, 1,
-# #         function(y) { lm(y ~ vape_6mo_lab + sex_lab + age,
-# #                          clin_metadata) %>% 
-# #             residuals()}) %>% 
-#   t
-# 
-# colnames(preruv_residuals) <- names(mvals)
+#Continue with K = 2
+plan(multisession)
+# Get the first pass residuals
+preruv_residuals <-
+  future_apply(mvals, 1,
+        function(y) { lm(y ~ vape_6mo_lab + sex_lab + age,
+                         clin_metadata) %>%
+            residuals()}) %>%
+  t
+
+colnames(preruv_residuals) <- names(mvals)
 
 #preruv_residuals_write <- preruv_residuals %>% as.data.frame %>% rownames_to_column(var = "CpG_Site")
 #write_csv(preruv_residuals_write, here("DataProcessed/methylation/ruv_residuals_2022_09_27.csv"))

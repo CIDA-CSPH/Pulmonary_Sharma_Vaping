@@ -1,0 +1,165 @@
+---
+title: Methylation Modeling Interim Report
+author: |
+ | Project: `r CIDAtools::ProjectName()`
+ |
+ | Analyst: `r CIDAtools::ProjectAnalyst()`
+ |
+ | Investigator(s): `r CIDAtools::ProjectPI()`
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+output:
+  html_document:
+    highlight: default
+    number_sections: no
+    code_folding: yes
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(here)
+library(gt)
+```
+
+# Introduction
+
+The purpose of this report is to provide interim analysis and interpretation of the methylation data for Sunita Sharma's teen vaping project. We have encountered some interesting features of the model, and want to document our decisions. 
+
+# Methods
+
+Up to this point, the data has been normalized using Noob, BMIQ, and RUVm. To find differentially methylated positions (DMPs), a linear model will be fit for each CpG site that remains after pre-processing and normalization and corrected using false detection rate (fdr).
+
+The same model as the RUV-Seq Analysis will be fit to maintain comparability for any future integrative analyses. The model will take the following form:
+
+$$M-Value = \beta_0 + \beta_1 * age + \beta_2 * center + \beta_3 * vape \ status + \beta_4 * ruv_{k1} + \beta_5 * ruv_{k2} + \epsilon_i$$
+
+# Results 
+
+Model results returned 0 CpG Sites significant at the $\alpha = 0.05$ level. Only one significant CpG site was found at the $\alpha = 0.2$ level. This is an unexpected result with unreasonably low success.
+```{r}
+
+kablize <- function(tab, digits = 3, capt) {
+  kableExtra::kable(tab,digits = digits, booktabs = T, caption = capt) %>% 
+    kableExtra::kable_styling(latex_options = c("scale_down", "striped"), position = "center", )
+}
+
+mod_res <- read_csv(here("DataProcessed/methylation/results/results_ruvk1_ruvk2.csv"), show_col_types = F) %>% 
+  column_to_rownames("CpG_Site")
+
+data.frame(Model = c("Full Model"), 
+           "FDR < 0.05" = sum(mod_res$fdr < 0.05),
+           "FDR < 0.1" = sum(mod_res$fdr < 0.1),
+           "FDR < 0.2" = sum(mod_res$fdr < 0.2)) %>% 
+  kablize(capt = "Model results for varying Type-I Error Rates under False Discovery Rate (FDR)")
+```
+
+To further explore the extremely low rate of discoveries, the figure below shows the distribution of p-values for the model results. 
+
+```{r fig.cap="p-value distribution"}
+
+
+mod_res %>% 
+  ggplot(aes(x = p.value)) +
+  geom_histogram(col = "white", bins = 20)+
+  labs(title = "P-value distribution",
+       y = "Count",
+       x = "p-value")
+```
+
+Model results show an unexpected distribution of p-values. This distribution may reflect multicollinearity or counfounding in the model. Associations of the included covariates are investigated below
+
+```{r }
+## load up the packages we will need:  (uncomment as required)
+
+
+
+
+# Read in files ---------------------------------------------------------------
+
+clin_metadata <- read.csv(here("DataProcessed/methylation/clin_metadata_w_ruv.csv")) %>% 
+  dplyr::rename("ruv_k1" = X1,
+                "ruv_k2" = X2) %>% 
+  drop_na(vape_6mo_lab, methylation_id) %>% 
+  mutate(vape_status = factor(vape_6mo_lab, 
+                              levels = c("Did Not Vape in Last 6 Months", "Vaped in Last 6 Months"),
+                              labels =  c("Not Vaped", "Vaped")),
+         recruitment_center = factor(recruitment_center, 
+                                     levels = c("Pueblo", "Aurora", "CommCity/Denver")))
+
+mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_final_2022_09_27.txt"), show_col_types = F) %>% 
+  column_to_rownames("CpG_Site") 
+
+mvals <- mvals[,colnames(mvals) %in% clin_metadata$sentrix_name]
+
+# Check Correlations ------------------------------------------------------
+
+check_corr<- function(y, x, dat){
+  #T.Test for categorical with 2 levels
+  if(is.factor(dat[[x]]) & length(levels(dat[[x]])) == 2){
+    temp_res <- t.test(dat[[y]] ~ dat[[x]])
+    pval <- temp_res$p.value
+  }
+  
+  #One-way AOV for categorical with > 2 levels
+  if(is.factor(dat[[x]]) & length(levels(dat[[x]])) > 2){
+    temp_res <- summary(aov(dat[[y]] ~ dat[[x]]))
+    pval <- as.numeric(temp_res[[1]]$`Pr(>F)`[1])
+  }
+  
+  #Two continuous variables
+  if(is.numeric(dat[[x]])){
+    temp_res <- cor.test(dat[[x]], dat[[y]])
+    pval <- temp_res$p.value
+  }
+return(pval)  
+}
+
+#Variables of interest
+vars_of_interest <- c("recruitment_center", "vape_status", "age")
+ruv_k1_corr <- sapply(vars_of_interest, function(x) check_corr("ruv_k1", x, dat = clin_metadata))
+ruv_k2_corr <- sapply(vars_of_interest, function(x) check_corr("ruv_k2", x, dat = clin_metadata))
+
+cbind(ruv_k1_corr, ruv_k2_corr) %>% 
+  as.data.frame() %>% 
+  mutate(test_type = c("One-way AOV", "T-test", "Pearson Correlation")) %>% 
+  dplyr::rename('ruv_K1' = ruv_k1_corr,
+         "ruv_K2" = ruv_k2_corr,
+         "Test Type" = test_type) %>% 
+  gt(rownames_to_stub = T) %>% 
+  fmt_number(columns = c(ruv_K1, ruv_K2), decimals = 3) %>% 
+  tab_style(style = gt::cell_text(color = "red"),
+    locations = list(gt::cells_body(columns = "ruv_K2", rows = ruv_K2 < 0.05))
+  ) %>% 
+  tab_options(table.width = 1000) %>% 
+  cols_align(align = "left") %>% 
+  tab_header(
+    title = "Table 1: P-Values for Association"
+  ) 
+```
+
+Table 1 shows that there is an association between ruv_K2 and recruitment center. This association could be serving as a source of multicollinearity that is driving the results presented above.
+
+# Conclusions
+
+Future models need to address the RUV factors as a source of multicollinearity. We also know from earlier reports that Recruitment Center may confound the effects of Vape Status, which could serve as another source worthy of investigation. Possible options to navigate these pitfalls could be a sensitivity analysis using only subjects from Pueblo, or models which included different higher-order RUV-factors. 
+
+<!-- footer -->
+
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```
+
