@@ -24,6 +24,7 @@ kablize <- function(tab, digits = 3) {
 
 # Read in files ---------------------------------------------------------------
 
+# Read in the  clinical metadata and clean up factors for analysis
 clin_metadata <- read.csv(here("DataProcessed/methylation/clin_metadata_w_ruv.csv")) %>% 
   dplyr::rename("ruv_k1" = X1,
                 "ruv_k2" = X2) %>% 
@@ -34,15 +35,16 @@ clin_metadata <- read.csv(here("DataProcessed/methylation/clin_metadata_w_ruv.cs
          recruitment_center = factor(recruitment_center, 
                                      levels = c("Pueblo", "Aurora", "CommCity/Denver")))
 
+#Read in the m-values
 mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_final_2022_09_27.txt")) %>% 
   column_to_rownames("CpG_Site") 
 
+#Subset the values to include only the samples with complete methylation data and vape status
 mvals <- mvals[,colnames(mvals) %in% clin_metadata$sentrix_name]
-
 
 # Write a function to fit the model ---------------------------------------
 mod_fit <- function(y){
-  fit <- lm(y ~ age + recruitment_center + sex_lab + vape_status + ruv_k1 + ruv_k2, data = clin_metadata)
+  fit <- lm(y ~ age + sex_lab + recruitment_center + vape_status + ruv_k1 + ruv_k2, data = clin_metadata)
   fit.out <-  summary(fit)
   res <-  fit.out$coefficients["vape_statusVaped",]
   return(res)
@@ -64,13 +66,13 @@ CpG_Results_df <- CpG_Results_df %>%
   rename("p.value" = `Pr(>|t|)`) %>% 
   rownames_to_column(var = "CpG_Site")
 
-write_csv(CpG_Results_df, here("DataProcessed/methylation/results/results_ruvk1_ruvk2.csv"))
+#write_csv(CpG_Results_df, here("DataProcessed/methylation/results/results_ruvk1_ruvk2_center_in_ruvmod.csv"))
 
 sig_sites <- CpG_Results_df[CpG_Results_df$fdr < 0.05,]
 
 CpG_Results_df %>% 
   ggplot(aes(x = p.value)) +
-  geom_histogram(col = "white", bins = 20)+
+  geom_histogram(col = "white", binwidth = 0.05)+
   labs(title = "P-value distribution",
        y = "Count",
        x = "p-value")

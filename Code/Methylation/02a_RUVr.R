@@ -107,10 +107,35 @@ get_ruv_res <- function (vals, resid, k) {
   return(pca_df)
 }
 
+ruv_k0 <- RUVr(x = mvals %>% as.matrix(), 
+               k = 0, 
+               residuals = preruv_residuals %>% as.matrix(),
+               isLog = T)
 
-ruv_k0 <- get_ruv_res(mvals, preruv_residuals, k = 0)
+ruv_k2 <- RUVr(x = mvals %>% as.matrix(),
+               k = 2,
+               residuals = preruv_residuals %>% as.matrix(),
+               isLog = T)
 
-ruv_k2 <- get_ruv_res(mvals, preruv_residuals, k = 2)
+#Extract RUV factors
+k2_factors <- ruv_k2$W %>% 
+  as.data.frame() %>% 
+  mutate(sentrix_name = names(preruv_residuals))
+
+#Join with metadata
+clin_metadata <- left_join(clin_metadata, k2_factors, by = "sentrix_name")
+
+clin_metadata <- clin_metadata %>% 
+  dplyr::rename(ruv_k1 = W_1,
+         ruv_k2 = W_2)
+
+#write out metadata for modelling
+write_csv(clin_metadata, here("DataProcessed/methylation/clin_metadata_w_RUVr.csv"))
+
+#PCA
+ruv_PCA_k0 <- get_ruv_res(mvals, preruv_residuals, k = 0)
+
+ruv_PCA_k2 <- get_ruv_res(mvals, preruv_residuals, k = 2)
 
 
 
