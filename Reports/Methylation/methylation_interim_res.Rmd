@@ -30,6 +30,7 @@ knitr::include_graphics(logo)
 knitr::opts_chunk$set(echo = FALSE)
 library(tidyverse)
 library(here)
+library(bacon)
 library(gt)
 ```
 
@@ -39,7 +40,7 @@ The purpose of this report is to provide interim analysis and interpretation of 
 
 # Methods
 
-Up to this point, the data has been normalized using Noob, BMIQ, and RUVm. To find differentially methylated positions (DMPs), a linear model will be fit for each CpG site that remains after pre-processing and normalization and corrected using false discovery rate (fdr).
+Up to this point, the data has been normalized using Noob, BMIQ, and RUVm. To find differentially methylated positions (DMPs), a linear model will be fit for each CpG site that remains after pre-processing and corrected using false discovery rate (fdr).
 
 The same model as the RUV-Seq Analysis will be fit to maintain comparability for any future integrative analyses. The model will look for changes in M-values due to vape status after adjusting for age, sex, recruitment center and two RUV-factors:
 
@@ -47,7 +48,7 @@ $$M-Value = \beta_0 + \beta_1 * age + \beta_2 * center + \beta_3* sex + \beta_4 
 
 # Results 
 
-Model results returned 0 CpG Sites significant at the $\alpha = 0.05$ level. Only one significant CpG site was found at the $\alpha = 0.2$ level. 
+Initial model results returned 0 CpG Sites significant at the $\alpha = 0.05$ level. 
 
 ```{r message=F, error=F, warning=F}
 
@@ -75,7 +76,7 @@ To further explore the extremely low rate of discoveries, the figure below shows
 ```{r}
 mod_res %>% 
   ggplot(aes(x = p.value)) +
-  geom_histogram(col = "white", bins = 20)+
+  geom_histogram(col = "white")+
   labs(y = "Count",
        x = "p-value")
 ```

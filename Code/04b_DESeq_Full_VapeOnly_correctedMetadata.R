@@ -7,11 +7,11 @@ library(RColorBrewer)
 library(kableExtra)
 
 ######################### Read in files so that they are unaltered and join ###############################
-filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_05_04.csv")))
+filtered_gene_count <- as.data.frame(read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/filtered_gene_count_2022_10_13.csv")))
 old_metadata <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/metadata_joined_rnaseq_04_20_2022.csv")))
 metadata_joined <- as.data.frame(read_csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv")))
-ruv_factor_dat <- read_csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_10_04.csv"))
-ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_05_06.csv")))
+ruv_factor_dat <- read_csv(here("DataProcessed/rna_seq/ruv/ruv_factor_data_k2_2022_10_13.csv"))
+ruv_norm_counts <- as.data.frame(read_csv(here("DataProcessed/rna_seq/ruv/RUV_k2_norm_counts_2022_10_13.csv")))
 gene_annotations <- read_tsv(here("DataRaw/RNA_Seq/gencode_annotations_choo.txt"))
 
 #subset to only samples included in DE
@@ -23,7 +23,7 @@ filtered_gene_count <- filtered_gene_count %>%
   dplyr::select(-Feature)
 
 #join metadata with ruv factor data
-metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = c("rna_id" = "new_id")) %>% 
+metadata_joined <- left_join(metadata_joined,ruv_factor_dat, by = "rna_id") %>% 
   select(-c(vape_status, age.y, male)) 
 metadata_joined <- metadata_joined %>%
   mutate(age = age.x, ruv_k1 = W_1, ruv_k2 = W_2) %>% 
@@ -154,14 +154,10 @@ vape_de <- run_deseq_lrt(count_data = filtered_gene_count,
 
 ######################### Get Formatted Results ###############################
 
-vape_res_2 <- format_results(vape_de, gene_annotations)
-
-#Filter it for boxplots 
-vape_res_2_cutoff <- vape_res_2 %>% 
-  filter(abs(log2FoldChange) > 2)
+vape_res <- format_results(vape_de, gene_annotations)
 
 #Write out results
-#write_csv(vape_res_2, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
+#write_csv(vape_res, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
 
 ######################### P-Value Histograms ###############################
 
