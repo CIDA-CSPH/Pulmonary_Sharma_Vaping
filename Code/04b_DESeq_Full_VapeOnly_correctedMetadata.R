@@ -47,6 +47,8 @@ metadata_joined$sex_lab <- factor(metadata_joined$sex_lab, levels = c("Female", 
 
 metadata_joined$recruitment_center <- factor(metadata_joined$recruitment_center, levels = c("Aurora", "CommCity/Denver", "Pueblo"), 
                                              labels = c("Aurora", "CommCity_Denver", "Pueblo"))
+
+metadata_joined$latino_lab <- factor(metadata_joined$latino_lab, levels = c("Non-LatinX", "LatinX"))
 #Scaling Age
 metadata_joined$age <- scale(metadata_joined$age)
 
