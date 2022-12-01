@@ -65,7 +65,7 @@ clin_metadata_BCfactors <- clin_metadata_BCfactors %>%
   mutate(vape_status = if_else(vape_6mo_lab == "Did Not Vape in Last 6 Months", "Not Vaped", "Vaped"))
 
 mod_fit <- function(y){
-  fit <- lm(y ~ age + sex_lab + recruitment_center + vape_status + BC_1 + BC_2, data = clin_metadata_BCfactors)
+  fit <- lm(y ~ age + sex_lab + vape_status + BC_1 + BC_2, data = clin_metadata_BCfactors)
   fit.out <-  summary(fit)
   res <-  fit.out$coefficients["vape_statusVaped",]
   return(res)
@@ -84,11 +84,13 @@ format_res <- function(res) {
     rename("p.value" = `Pr(>|t|)`) %>% 
     rownames_to_column(var = "CpG_Site")
 }
+
 full_res <- format_res(full_res)
 
 hist(full_res$p.value, 
      main = "ComBat -> BCConf (k = 2 factors)",
      xlab = "p-value")
+
 ruvr_res <- read_csv(here("DataProcessed/methylation/results/results_RUVr_k2.csv"))
 
 hist(ruvr_res$p.value,
