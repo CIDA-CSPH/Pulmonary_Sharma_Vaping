@@ -29,7 +29,7 @@ knitr::include_graphics(logo)
 ------------------------------------------------------------------------
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+knitr::opts_chunk$set(echo = T, message = F, error = F, warning = F)
 library(tidyverse)
 library(knitr)
 library(kableExtra)
@@ -98,6 +98,28 @@ This model tests for differential methylation among subjects who have vaped in t
 ## Solution 2: Use Bacon @vaniterson2017 to control for deflated p-values
 
 This model follows the same framework of the full model outlined in the methods section. After fitting the model however, the methods implemented in the r-package `bacon` use the empirical null distribution to estimate both the bias and inflation of the model test-statistics.
+
+# Results
+
+```{r}
+no_center <- read_csv(here("DataProcessed/methylation/results/noCenter_res_2022_12_01.csv"))
+
+bacon_res <- read_csv(here("DataProcessed/methylation/results/full_res_bacon_2022_12_01.csv"))
+
+noCenter_sig <- no_center[no_center$fdr < 0.05,]
+bacon_sig <- bacon_res[bacon_res$fdr.bacon < 0.05, ]
+
+no_center %>% 
+  arrange(fdr)
+
+par(mfrow = c(1, 2))
+hist(no_center$p.value, main = "No Center",
+     xlab = "p-value",
+     ylim = c(0,40000))
+hist(bacon_res$pval.bacon, main = "Bacon-Corrected", xlab = "p-value")
+```
+
+
 
 <!-- footer -->
 
