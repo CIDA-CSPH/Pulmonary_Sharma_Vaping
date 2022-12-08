@@ -35,6 +35,7 @@ library(knitr)
 library(kableExtra)
 library(bacon)
 library(here)
+library(gt)
 ```
 
 # Introduction
@@ -83,44 +84,120 @@ Table 1 shows a decrease from N = 12 to N = 11 vapers in comparison with the RNA
 
 # Results
 
-The "methylation_interim_results" document the issue of model misspecification. The problem may be summarised by looking at p-value distributions for models which test varying combinations of covariates. All of the models below adjust for vape status, age, and sex. The sub-title of each figure documents the additional covariates added to the model which produced the corresponding p-value distribution.
+The "methylation_interim_results" document the issue of model misspecification. The problem may be summarized by looking at p-value distributions for models which test varying combinations of covariates. All of the models below adjust for vape status, age, and sex. The sub-title of each figure documents the additional covariates added to the model which produced the corresponding p-value distribution.
 
 ![Figure 1: P-value distribution for all pairwise models with recruitment center and the two ruv factors as covariates](All_mod_pval_distributions.jpeg)
 
-In summary, it appears that the multicollinearity between recruitment center and and vape status is driving the pattern of deflated p-values seen in the 'Full Model'.
+The models show an anti-conservative distribution of p-values when adjusting for no covariates, and a uniform distribution when accounting only for the two latent factors (RUV_K1 + RUV_K2). The models show a trend of deflated p-values  whenever recruitment center is included in the model. In summary, it appears that the collinearity between recruitment center and and vape status is driving the pattern of deflated p-values seen in the 'Full Model'.
 
-We will report the results from two models which pose solutions to the problem of deflated p-values. The first solution is to exclude recruitment center from the model as seen in Figure 1 (plot 'RUV_K1 + RUV_K2'). The other is to attempt to control for the deflation @vaniterson2017.
+We will report the results from two models which pose solutions to the problem of deflated p-values. The first solution is to exclude recruitment center from the model as seen in Figure 1 (plot 'RUV_K1 + RUV_K2'). We will refer to this as the **no center** model. The other solution is to attempt to control for the deflation using Bayesian methods to estimate potential inflation and bias in the p-value distribution @vaniterson2017. We will refer to this as the **bacon** model.
 
-## Solution 1: Drop *recruitment center* from the model
+*Fig. 2* shows  p-value distribtions for the two proposed models. The *no center* model shows no biological signal, while the *Bacon* model shows a slight peak near 0. 
 
-This model tests for differential methylation among subjects who have vaped in the last 6 months vs. those who have not after controlling for age, sex, and two RUV factors.
+```{r fig.cap='P-value distributions for the two proposed models.'}
+# Read in the results -----------------------------------------------------
 
-## Solution 2: Use Bacon @vaniterson2017 to control for deflated p-values
 
-This model follows the same framework of the full model outlined in the methods section. After fitting the model however, the methods implemented in the r-package `bacon` use the empirical null distribution to estimate both the bias and inflation of the model test-statistics.
+full_res <- read_csv(here("DataProcessed/methylation/results/results_ruvk1_ruvk2.csv"))
 
-# Results
 
-```{r}
-no_center <- read_csv(here("DataProcessed/methylation/results/noCenter_res_2022_12_01.csv"))
+# run bacon ---------------------------------------------------------------
 
-bacon_res <- read_csv(here("DataProcessed/methylation/results/full_res_bacon_2022_12_01.csv"))
+bc <- bacon(teststatistics = full_res$`t value`,
+            standarderrors = full_res$`Std. Error`)
 
-noCenter_sig <- no_center[no_center$fdr < 0.05,]
-bacon_sig <- bacon_res[bacon_res$fdr.bacon < 0.05, ]
+## bacon inflation factor
+bc_inflation <- inflation(bc)
 
-no_center %>% 
-  arrange(fdr)
+## bacon bias
+bc_bias <- bias(bc)
+
+## bacon-corrected pvals
+pvals.corr <- pval(bc)
+
+full_res$pval.bacon <- as.vector(pvals.corr)
+full_res$fdr.bacon <- p.adjust(full_res$pval.bacon, method = "fdr")
+
+# Pick out desired results
+bacon_res <- full_res %>% 
+  select(CpG_Site, Estimate, `Std. Error`, pval.bacon, fdr.bacon) %>% 
+  rename(pval = pval.bacon, 
+         fdr = fdr.bacon)
+
+no_center_res <- read_csv(here("DataProcessed/methylation/results/noCenter_res_2022_12_01.csv"))
+
+#bacon_res <- read_csv(here("DataProcessed/methylation/results/full_res_bacon_2022_12_01.csv"))
+
+noCenter_sig <- no_center_res[no_center_res$fdr < 0.05,]
+bacon_sig <- bacon_res[bacon_res$fdr < 0.05, ]
 
 par(mfrow = c(1, 2))
-hist(no_center$p.value, main = "No Center",
+hist(no_center_res$p.value, main = "No Center",
      xlab = "p-value",
      ylim = c(0,40000))
-hist(bacon_res$pval.bacon, main = "Bacon-Corrected", xlab = "p-value")
+hist(bacon_res$pval, main = "Bacon", xlab = "p-value")
 ```
 
+The model using the bacon correction returned `r nrow(bacon_sig)` significant CpG Sites while the No Center model returned `r nrow(noCenter_sig)` significant CpG sites. Table 2 shows the significant CpG Sites returned by the bacon-corrected model and how those sites rank in the No Center model. 
+```{r}
+no_center_res <- no_center_res %>% 
+  arrange(p.value) %>% 
+  mutate(Rank = seq(1, length(p.value), 1),
+         p.value = if_else(p.value < 0.001, "< 0.001", as.character(round(p.value, 3))),
+         fdr = round(fdr, 3)) %>% 
+  select(CpG_Site, Estimate, `Std. Error`, p.value, fdr, Rank)
 
+bacon_res <- bacon_res %>% 
+  arrange(pval) %>% 
+  mutate(Rank = seq(1, length(pval), 1),
+         pval = if_else(pval < 0.001, '< 0.001', as.character(round(pval, 3)))) %>% 
+  select(CpG_Site, Estimate, `Std. Error`, pval, fdr, Rank)
 
+all_res <- left_join(bacon_res, no_center_res, by = "CpG_Site", suffix = c(".bacon", ".noCenter"))
+
+all_res_sig <- all_res[all_res$fdr.bacon < 0.05,]
+
+gt_tbl <- all_res %>% 
+  filter(fdr.bacon < 0.05) %>% 
+  gt() %>% 
+  tab_header(title = "Table 2: Significant Bacon Results Compared to No Center Results") %>% 
+  tab_spanner(label = "Bacon",
+              columns = c(Estimate.bacon, `Std. Error.bacon`, pval, fdr.bacon, Rank.bacon)) %>% 
+  tab_spanner(label = "No Center",
+              columns = c(Estimate.noCenter, `Std. Error.noCenter`, p.value, fdr.noCenter, Rank.noCenter)) %>% 
+  fmt_number(columns = c(Estimate.bacon, `Std. Error.bacon`, Estimate.noCenter, `Std. Error.noCenter`),
+             decimals = 3) %>% 
+  cols_label(CpG_Site = 'CpG Site',
+             Estimate.bacon = 'Estimate',
+             `Std. Error.bacon` = 'Std. Error', 
+             pval = "p-value", 
+             fdr.bacon = "FDR", 
+             Rank.bacon = "Rank",
+             Estimate.noCenter = "Estimate",
+             `Std. Error.noCenter` = "Std. Error", 
+             p.value = "p-value", 
+             fdr.noCenter = "FDR", 
+             Rank.noCenter = "Rank")
+gt_tbl
+```
+Of the significant CpG Site returned by the Bacon model, only 5 remain in the top 10 in the **No Center** model.
+
+**Fig. 3** shows estimates for both the Bacon model and the No Center model and how the estimates change across the model. The red diagonal line indicates equivalent estimates. 
+```{r}
+all_res %>% 
+  ggplot(aes(x = Estimate.bacon, y = Estimate.noCenter)) +
+  geom_point()+
+  geom_abline(slope = 1,
+              intercept = 0,
+              col = 'red')+
+  labs(y = "No Center",
+       x = "Bacon",
+       title = "Estimate Comparison")
+```
+
+# Conclusion
+
+There were two solutions proposed for the problem of deflated p-values presented by the full model. In summary, the model which did not adjust for the effects of recruitment center found no biological signal, while the model which used the bacon-adjustment found `r nrow(bacon_sig)`. We feel that we should be skeptical of these significant sites due to low statistical power. The Differentially Methylated Region (DMR) analysis is still to come, and will have lower burden of multiple testing. Detecting broader patterns in the methylation profile may be a more reasonable expectation. 
 <!-- footer -->
 
 ------------------------------------------------------------------------

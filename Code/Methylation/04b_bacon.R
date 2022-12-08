@@ -32,7 +32,9 @@ full_res <- read_csv(here("DataProcessed/methylation/results/results_ruvk1_ruvk2
 
 bc <- bacon(full_res$`t value`)
 
-
+esetimates.corr <- estimates(bc)
+bc_inflation <- inflation(bc)
+bc_bias <- bias(bc)
 pvals.corr <- pval(bc)
 
 full_res$pval.bacon <- as.vector(pvals.corr)
