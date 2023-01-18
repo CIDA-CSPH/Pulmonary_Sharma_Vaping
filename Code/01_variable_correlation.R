@@ -7,7 +7,7 @@ library(vcd)
 library(proxyC)
 library(janitor)
 library(rstatix)
-
+library(kableExtra)
 ###############################################################################################
 ##GET P-Value Histograms
 #read in raw gene counts
@@ -60,7 +60,7 @@ filtered_gene_count <- filtered_gene_count[,metadata_joined$new_id]
 ###############################################################################################
 #Test for Correlation between all variables of Interest########################################
 #Load variables 
-tab1_dat <- read_csv(file = here("DataProcessed/clinical_metadata/table1_clean_data_2022_08_22.csv"))
+tab1_dat <- read_csv(file = here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv"))
 
 #Subset to only variables of interest
 vars_of_interest <- tab1_dat %>% 
@@ -140,3 +140,46 @@ age_report <- tibble("Test Variable" = "Age",
                      )
 age_report_tab <- kable(age_report, digits = 1, booktabs = T) %>% 
   kable_styling(latex_options = "striped")
+
+r5_ttest <- t.test(tab1_dat$r5 ~ tab1_dat$vape_6mo_lab)
+
+x20_ttest <- t.test(tab1_dat$x20 ~ tab1_dat$vape_6mo_lab)
+
+x20_tes <- wilcox.test(tab1_dat$x20 ~ tab1_dat$vape_6mo_lab, exact = F)
+
+hist(tab1_dat$x20, probability = T)
+lines(density(tab1_dat$x20, na.rm = T), lwd = 2, col = 'red')
+
+vape_colors <- RColorBrewer::brewer.pal(3, "Dark2")[0:2]
+
+r5_plot <- ggpubr::ggboxplot(tab1_dat %>% drop_na(vape_6mo_lab), 
+                  x = "vape_6mo_lab", y = "r5", fill = "vape_6mo_lab",
+                  palette = vape_colors,
+                  ggtheme = theme_grey()) +
+  ggpubr::stat_compare_means(method = 't.test',
+                             label.x = 0.6,
+                             size = 5) +
+  labs(x = "",
+       y = "R5",
+       fill = "Vape Status",
+       title = "R5 by Vape Status (N = 49)")
+
+x20_plot <- ggpubr::ggboxplot(tab1_dat %>% drop_na(vape_6mo_lab), 
+                  x = "vape_6mo_lab", y = "x20", fill = "vape_6mo_lab",
+                  palette = vape_colors,
+                  ggtheme = theme_grey()) +
+  ggpubr::stat_compare_means(label.x = 0.6,
+                             label.y = 3,
+                             size = 5) +
+  labs(x = "",
+       y = "X20",
+       fill = "Vape Status",
+       title = "X20 by Vape Status (N = 44)")
+
+ggpubr::ggarrange(r5_plot, x20_plot, common.legend = T)
+
+tab1_dat %>% 
+  drop_na(vape_6mo_lab) %>% 
+  ggplot(aes(x = vape_6mo_lab, y = r5, fill = vape_6mo_lab)) +
+  geom_boxplot() +
+  scale_fill_manual(values = vape_colors)

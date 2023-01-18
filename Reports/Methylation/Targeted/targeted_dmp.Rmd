@@ -1,0 +1,105 @@
+---
+title: Targeted Methylation Results
+author: |
+ | Project: Differential Gene Expression and Pulmonary Function in Vaping LatinX Adolescents
+ |
+ | Analyst: Trent Hawkins
+ |
+ | Investigator(s): Sunita Sharma, MD
+ |
+ | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
+output:
+  html_document:
+    highlight: espresso
+    number_sections: no
+    theme: yeti
+    toc: yes
+    toc_depth: 2
+    toc_float: yes
+csl: ama.csl
+bibliography: references.bib
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
+knitr::include_graphics(logo)
+```
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(table1)
+require(here)
+library(gt)
+
+
+kablize <- function(tab, digits = 3) {
+  kable(tab,digits = digits, booktabs = T) %>% 
+  kableExtra::kable_styling(latex_options = c("hold_position", "striped"), position = "center")
+}
+
+format_num <- function(number, digits = 0, format = "f") {
+  formatC(number, digits = digits, format = format, big.mark = ",")
+}
+
+# Load the results from code "05_targeted_meth.R"
+sigCites.final <- read_csv(here("DataProcessed/methylation/results/results_targeted_2023_01_11.csv"))
+
+# Load RNASeq REsults
+RNAseq.res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_13.csv"))
+```
+
+# Introduction
+
+The purpose of this report is to discover differential methylation among the subset of CpG sites targeted by the genes found to be differentially expressed in the report "teen_vape_DE_report_*yyyy_mm_dd*". Due to the limited sample size, a targeted analysis was chosen to increase statistical power by limiting the effects of multiple testing.  
+
+# Methods
+
+In order to create a targeted subset of CpG Sites, we first had to map CpG sites to their respective genes. This task was accomplished using Annotation for Illumina's EPIC methylation arrays @kasper2017. After which, a subset of CpG Sites was selected based upon the 7,136 genes found to be significantly associated with whether the subject had vaped in the last six months in a previous analysis (FDR < 0.05). Finally, we repeated the False Discovery Rate (FDR) p-value adjustment for multiple testing using the bacon-corrected p-values presented in the previous EWAS report ("DMP_Results_*yyyy_mm_dd*").
+
+# Results 
+
+7,136 differentially expressed genes mapped to `r format_num(length(unique(sigCites.final$cpg)))` unique CpG sites. After subsetting those sites from the full EWAS, only one was significantly differentially methylated using a type-I error rate of 0.05. Increasing the allowed type-I error rate to 0.1 allowed for one additional site. At a type-I error rate of 0.2, there were 36 differentially methylated positions. Table 1 gives the top 10 sorted by adjusted p-value and estimate size. 
+
+```{r}
+sigCite <- sigCites.final %>% 
+  filter(fdr.target < 0.1)
+
+sigGenes <- RNAseq.res %>% 
+  filter(gene_name %in% sigCite$symbol)
+
+sigCites.final %>% 
+  arrange(fdr.target, Estimate) %>% 
+  mutate(pval.bacon = if_else(pval.bacon < 0.001, "< 0.001", as.character(pval.bacon))) %>% 
+  dplyr::rename("CpG" = cpg,
+                "Associated Gene Name" = symbol,
+                "Estimate (M)" = Estimate,
+                "p-value" = pval.bacon,
+                "FDR" = fdr.target) %>%
+    .[1:10,] %>% 
+  gt() %>% 
+  fmt_number(columns = c(3, 4, 5, 7),
+             decimals = 3) %>% 
+  tab_header(title = "Table 1: Top 10 Targeted CpG Sites by p-value") %>% 
+  tab_options(table.width = 700)
+
+```
+
+Overall, there was only one CpG site in the targeted analysis that may be considered significantly differentially expressed at a type-I error rate of 0.05. That site is `r sigCite$cpg[1]` and it maps to the gene `r sigCite$symbol[1]` using Illumina's EPIC annotation. In the context of this analysis, the site is *less* methylated in vapers compared to non-vapers. This result is consistent with RNASeq results where the gene was found to be up-regulated (`r format_num(sigGenes$log2FoldChange[2], digits = 3)`, p = `r format_num(sigGenes$padj[2], digits = 2)`). One additional site, `r sigCite$cpg[2]` may be considered marginally significant at an FDR-adjusted p-value of `r format_num(sigCite$fdr.target[2], digits = 2)`. That position maps to the gene `r sigCite$symbol[2]`. That gene was also found to be up-regulated in RNASeq results (`r format_num(sigGenes$log2FoldChange[1], digits = 3)`, p = `r format_num(sigGenes$padj[1], digits = 2)`).
+
+# Conclusions
+  The small study population is a limiting factor in this analysis, but the few differentially methylated positions presented here may provide some initial evidence for differential methylation patterns in vaping adolescents. The next analysis will examine the epigenome for differentially methylated regions, which will further reduce the burden of multiple testing and highlight methylation patterns among vapers and non-vapers.  
+
+# References
+::: {#refs}
+:::
+---
+
+```{r, echo=FALSE, out.width='70%', fig.show='hold'}
+knitr::include_graphics(logo)
+```
+

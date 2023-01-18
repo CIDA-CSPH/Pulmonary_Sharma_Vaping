@@ -144,13 +144,14 @@ no_center_res <- no_center_res %>%
   arrange(p.value) %>% 
   mutate(Rank = seq(1, length(p.value), 1),
          p.value = if_else(p.value < 0.001, "< 0.001", as.character(round(p.value, 3))),
-         fdr = round(fdr, 3)) %>% 
+         fdr = if_else(fdr > 0.99, "> 0.99", as.character(round(fdr, 3)))) %>% 
   select(CpG_Site, Estimate, `Std. Error`, p.value, fdr, Rank)
 
 bacon_res <- bacon_res %>% 
   arrange(pval) %>% 
   mutate(Rank = seq(1, length(pval), 1),
-         pval = if_else(pval < 0.001, '< 0.001', as.character(round(pval, 3)))) %>% 
+         pval = if_else(pval < 0.001, '< 0.001', as.character(round(pval, 3))),
+         fdr = if_else(fdr < 0.001, "< 0.001", as.character(round(fdr, 3)))) %>% 
   select(CpG_Site, Estimate, `Std. Error`, pval, fdr, Rank)
 
 all_res <- left_join(bacon_res, no_center_res, by = "CpG_Site", suffix = c(".bacon", ".noCenter"))
@@ -186,7 +187,7 @@ Of the significant CpG Site returned by the Bacon model, only 5 remain in the to
 ```{r}
 all_res %>% 
   ggplot(aes(x = Estimate.bacon, y = Estimate.noCenter)) +
-  geom_point()+
+  geom_point(alpha = 0.25)+
   geom_abline(slope = 1,
               intercept = 0,
               col = 'red')+

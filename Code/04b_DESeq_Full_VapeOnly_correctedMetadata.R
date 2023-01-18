@@ -59,9 +59,13 @@ rownames(metadata_joined) <- metadata_joined$rna_id
 all(rownames(metadata_joined) == colnames(filtered_gene_count))
 
 ######################### Design Matrices ###############################
+full_sex_interact <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 + vape_6mo_lab + sex_lab * vape_6mo_lab
+
 full_design <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 + vape_6mo_lab 
 
 reduced <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2
+
+reduced_interact <- ~ sex_lab + age + recruitment_center + ruv_k1 + ruv_k2 + vape_6mo_lab
 
 ######################### Required Functions ###############################
 # format numbers
@@ -70,14 +74,28 @@ format_num <- function(number, digits = 0) {
 }
 
 #Run DESeq
-run_deseq_lrt <- function(count_data, col_data, full_mod, reduced_mod) {
+run_deseq_lrt <- function(count_data, col_data, full_mod, reduced_mod, interact = F, maxit = 100) {
   
-  #Create the DESeq Object
-  deseq_object <- DESeqDataSetFromMatrix(countData = count_data,
-                                         colData = col_data,
-                                         design = full_mod)
-  #Run DESeq
-  deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod, )
+  if (interact == F) {
+    #Create the DESeq Object
+    deseq_object <- DESeqDataSetFromMatrix(countData = count_data,
+                                           colData = col_data,
+                                           design = full_mod)
+    #Run DESeq
+    deseq_run <- DESeq(deseq_object, test = "LRT", reduced = reduced_mod)
+  }
+  
+  if (interact == T) {
+    #Create the DESeq Object
+    deseq_object <- DESeqDataSetFromMatrix(countData = count_data,
+                                           colData = col_data,
+                                           design = full_mod)
+    
+    deseq_object <- estimateSizeFactors(deseq_object)
+    deseq_object <- estimateDispersions(deseq_object)
+    #Run DESeq
+    deseq_run <- nbinomLRT(deseq_object, reduced = reduced_mod, maxit = maxit)
+  }
   
   #Return the results
   return(deseq_run)
@@ -105,7 +123,19 @@ p_hist <- function(de_results) {
 }
 
 #tidy results for plotting (RUV-Normalized)
-ruv_res_tidy <- function(ruv_count_dat, de_res, col_data, annotation) {
+ruv_res_tidy <- function(ruv_count_dat, de_res, col_data, annotation, upreg = T) {
+  
+  if (upreg == T) {
+    de_res <- de_res %>% 
+      filter(log2FoldChange > 2) %>% 
+      arrange(pvalue)
+  }
+  
+  if (upreg == F) {
+    de_res <- de_res %>% 
+      filter(log2FoldChange < -2) %>% 
+      arrange(pvalue)
+  }
   #Get top 4 genes of interest
   genes_of_interest <- de_res$ensg[1:4]
   
@@ -121,18 +151,17 @@ ruv_res_tidy <- function(ruv_count_dat, de_res, col_data, annotation) {
 }
 
 #Results Boxplots (Vape and Center, Vape Only, Center Only)
-tcount_boxplot <- function(tcounts, mod) {
+tcount_boxplot <- function(tcounts, title) {
   
   #Stratified by vape status only
   vape_box <- tcounts %>% 
     ggplot(aes(vape_6mo_lab, expression, fill= vape_6mo_lab)) + 
     geom_boxplot() + 
-    geom_text(label = if_else(tcounts$Row.names == "Sample12", tcounts$Row.names, ""), col = "Red") +
     labs(x="Vape Status (6 mo)", 
          y="Expression (log normalized counts)", 
          fill = "Vape Status (6 mo)", 
-         title= paste0("Top Genes (", mod, ")")) +
-    scale_fill_manual(values = vape_colors) +
+         title= title) +
+    scale_fill_discrete(type = vape_colors, labels = c("Not Vaped", "Vaped")) +
     facet_wrap(~symbol, scales="free_y") +
     theme(axis.text.x = element_blank(),
           axis.ticks.x = element_blank(),
@@ -154,9 +183,18 @@ vape_de <- run_deseq_lrt(count_data = filtered_gene_count,
                          full_mod = full_design,
                          reduced_mod = reduced)
 
+vape_interact_de <- run_deseq_lrt(count_data = filtered_gene_count, 
+                                 col_data = metadata_joined,
+                                 full_mod = full_sex_interact,
+                                 reduced_mod = reduced_interact,
+                                 interact = T,
+                                 maxit = 10000)
+
 ######################### Get Formatted Results ###############################
 
 vape_res <- format_results(vape_de, gene_annotations)
+
+vape_sex_res <- format_results(vape_interact_de, gene_annotations)
 
 #Write out results
 #write_csv(vape_res, file = here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_06.csv"))
@@ -168,23 +206,45 @@ vape_only_phist <- p_hist(vape_res_2) +
   labs(title = "Vape Only")
 
 ######################### Top Genes Tidy RUV-Norm Counts ###############################
+#Pull out top genes from OG DESeq from Interaction DESeq
+top_og_genes <- vape_res %>% 
+  arrange(pvalue) %>% 
+  .[1:20,]
 
-vape_ruv_tidy <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
-                              de_res = vape_res_2,
+stratified_res <- vape_sex_res %>% 
+  filter(gene_name %in% top_og_genes$gene_name)
+# NO difference by sex
+
+#Get top genes with abs l2fc > 2 and l2fc < -2
+vape_ruv_tidy_upreg <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
+                              de_res = vape_res,
                               col_data = metadata_joined,
-                              annotation = gene_annotations)
+                              annotation = gene_annotations,
+                              upreg = T)
+
+vape_ruv_tidy_downreg <- ruv_res_tidy(ruv_count_dat = ruv_norm_counts,
+                                      de_res = vape_res,
+                                      col_data = metadata_joined,
+                                      annotation = gene_annotations,
+                                      upreg = F)
 
 #write out results
 # write_csv(vape_ruv_tidy, file = here("DataProcessed/de_full/top4_vape_ruv_normcounts_2022_06_14.csv"))
 
 
 ######################### Top Gene Boxplots RUV Counts ###############################
+
+
 #Set color pallettes to match
 vape_colors <- brewer.pal(3,"Set2")
 
 #Vape only
-vape_plots_ruv <- tcount_boxplot(tcounts = vape_ruv_tidy, mod = "Vape Only")
+vape_plots_ruv_upreg <- tcount_boxplot(tcounts = vape_ruv_tidy_upreg, title = "Top Upregulated (L2FC > 2)")
+
+vape_plots_ruv_downreg <- tcount_boxplot(vape_ruv_tidy_downreg, title = "Top Downregulated (L2FC < -2)")
 
 
-vape_plots_ruv
+vape_plots_ruv_upreg
+vape_plots_ruv_downreg
 
+ggpubr::ggarrange(vape_plots_ruv_upreg, vape_plots_ruv_downreg, common.legend = T, legend = "bottom")

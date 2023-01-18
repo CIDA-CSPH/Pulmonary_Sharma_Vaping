@@ -52,11 +52,9 @@ format_num <- function(number, digits = 0, format = "f") {
 
 ```{r import data, include=FALSE}
 #import data
-source(here("Code/00_clean_metadata.R"), local = knitr::knit_global())
 
 #filter out 1 NA for vape status
-tab1_dat <- tab1_dat %>% 
-  filter(!is.na(vape_6mo_lab))
+tab1_dat <- read_csv(here("DataProcessed/clinical_metadata/master_clinical_metadata_2022_09_02.csv"))
 
 ```
 

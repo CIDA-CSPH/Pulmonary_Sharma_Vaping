@@ -11,6 +11,7 @@
 
 require(tidyverse)
 require(here)
+require(EnhancedVolcano)
 
 results <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_13.csv"))
 
@@ -21,6 +22,41 @@ results <- results %>%
          "Log2FoldChange" = log2FoldChange,
          "p-value" = pvalue,
          "FDR" = padj) %>% 
-  select(-c(gene_type, baseMean, lfcSE, stat))
+  select(-c(gene_type, baseMean, lfcSE, stat)) %>% as.data.frame()
+
+lab_italics <- paste0("italic('", results$Symbol, "')")
+selectLab_italics = paste0(
+  "italic('",
+  c("NDC80", "PTGER3", "MUC5AC", "MUC12", "WNT5B, WNT3A", "WNT4", 'IL1B', 'DPYS', 'DEFB4B', 'EIF1AY'),
+  "')")
+
+EnhancedVolcano(results,
+                lab = lab_italics,
+                x = 'Log2FoldChange',
+                y = 'p-value',
+                selectLab = selectLab_italics,
+                xlab = bquote(~Log[2]~ 'fold change'),
+                pCutoff = 0.05,
+                pCutoffCol = 'FDR',
+                FCcutoff = 2.0,
+                pointSize = 3.0,
+                labSize = 4.0,
+                labCol = 'black',
+                labFace = 'bold',
+                boxedLabels = TRUE,
+                parseLabels = TRUE,
+                colAlpha = 4/5,
+                legendPosition = 'bottom',
+                legendLabSize = 14,
+                legendIconSize = 4.0,
+                drawConnectors = TRUE,
+                max.overlaps = Inf,
+                widthConnectors = 1.0,
+                colConnectors = 'black',
+                title = "Volcano Plot of DESeq2 Results",
+                subtitle = "",
+                caption = "Total = 16860 Genes") + coord_flip()
+
+
 
 write_csv(results, here("DataProcessed/rna_seq/differential_expression/full_analysis/vape_results_reporting_2022_12_01.csv"))
