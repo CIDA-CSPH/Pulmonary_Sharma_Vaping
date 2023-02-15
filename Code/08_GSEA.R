@@ -375,3 +375,5 @@ writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea/react_full_res_20
 #Write out go results
 list_of_datasets <- list("pathway_level" = go_res_suplement, "gene_level" = go_res_full)
 writexl::write_xlsx(list_of_datasets, here("DataProcessed/gsea/go_full_res_2022_10_20.xlsx"))
+
+write_csv(go_res_full, here("DataProcessed/gsea/go_gene_level_res_2023_01_19.csv"))

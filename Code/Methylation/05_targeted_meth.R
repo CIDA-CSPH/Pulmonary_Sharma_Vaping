@@ -79,18 +79,6 @@ require(openxlsx)
 ## Read in results
 RNAseq.res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_13.csv"))
 
-RNAseq.res %>% 
-  dplyr::filter(gene_name == "REX1")
-
-## Fix Ensemble ID's  and join with symbols
-RNAseq.res$ensg <- gsub("\\..*", "", RNAseq.res$ensg)
-
-## Map Ensembl to ENTREZ
-genes_tested <- bitr(RNAseq.res$ensg, fromType = "ENSEMBL", toType="ENTREZID", OrgDb="org.Hs.eg.db", drop = F)
-
-## Join up the genes
-RNAseq.res <- left_join(RNAseq.res, genes_tested, by = c("ensg" = "ENSEMBL"))
-
 ## Get significant genes
 RNAseq.sig <- RNAseq.res %>% 
   filter(padj < 0.05)
@@ -106,7 +94,7 @@ genes_to_cpg <- .getFlatAnnotation(array.type = "EPIC")
 
 ## Filter for CpGs associated with significant genes
 sigGene.map <- genes_to_cpg %>% 
-  dplyr::filter(entrezid %in% RNAseq.sig$ENTREZID)
+  dplyr::filter(symbol %in% RNAseq.sig$gene_name)
 
 ## Get unique CpG loci
 sigGene.cpgs <- unique(sigGene.map$cpg)
@@ -118,32 +106,46 @@ methRes.target <- meth_res %>%
 ## Re-adjust the p-values
 methRes.target$fdr.target <- p.adjust(methRes.target$pval.bacon, method = "fdr")
 
-## Left join with mapped gene symbols
-#methRes.target <- left_join(methRes.target, sigGene.map, by = c("CpG_Site" = "cpg"))
-
-## Map CpGs back to genes
+## Subset new sig cpgs
 sig.target.cpgs <- methRes.target %>% 
   dplyr::filter(fdr.target < 0.1)
 
-
+## Map CpGs back to genes
 sigGene.map %>% 
   dplyr::filter(cpg %in% sig.target.cpgs$CpG_Site)
 
+## Create dataframe for final results
 sigCites.final <- left_join(sigGene.map, methRes.target %>% dplyr::select(CpG_Site, Estimate, `Std. Error`, `t value`, pval.bacon, fdr.target), by = c("cpg" = "CpG_Site")) %>% 
   drop_na(fdr.target) %>% 
   dplyr::select(cpg, symbol, Estimate, `Std. Error`, `t value`, pval.bacon, fdr.target) %>% 
   distinct()
 
-sigCites.report <- sigCites.final %>% 
+## Only results we want to report to the investigator
+sigCites.report <- sigCites.final %>%
+  left_join(., RNAseq.res, by = c("symbol" = "gene_name")) %>% 
+  dplyr::mutate(gene.reg = if_else(log2FoldChange > 0, '+', '-')) %>% 
   filter(fdr.target < 0.2) %>% 
   dplyr::arrange(fdr.target) %>% 
-  distinct()
+  distinct() %>% 
+  dplyr::select(cpg, symbol, Estimate, `Std. Error`, `t value`, pval.bacon, fdr.target, gene.reg) %>% 
+  dplyr::rename("CpG Site" = cpg,
+                "Symbol" = symbol,
+                "Estimate (M)" = Estimate,
+                "pval" = pval.bacon,
+                "FDR" = fdr.target)
 
+## Get records for related genes
 sigCites.generelate <- RNAseq.res %>% 
-  dplyr::filter(gene_name %in% sigCites.report$symbol)
+  dplyr::filter(gene_name %in% sigCites.report$Symbol) %>% 
+  dplyr::rename("EnsemblID" = ensg,
+                "Symbol" = gene_name,
+                "Std. Error" = lfcSE,
+                "t-value" = stat,
+                "pval" = pvalue,
+                "FDR" = padj) %>% 
+  dplyr::select(-c(gene_type, baseMean))
 
-write_csv(sigCites.final, here("DataProcessed/methylation/results/results_targeted_2023_01_11.csv")) 
-
-write_csv(sigCites.report, here("DataProcessed/methylation/results/results_targeted_sigonly_2023_01_12.csv"))
-
-write_csv(sigCites.generelate, here("DataProcessed/methylation/results/results_targetedgenes_sigonly_2023_01_13.csv"))
+## Write out the results
+#Write out go results
+list_of_datasets <- list("DMP" = sigCites.report, "Associated Genes" = sigCites.generelate)
+writexl::write_xlsx(list_of_datasets, here("DataProcessed/methylation/results/targeted/targetedDMP_results_reporting_2023_01_26.xlsx"))
