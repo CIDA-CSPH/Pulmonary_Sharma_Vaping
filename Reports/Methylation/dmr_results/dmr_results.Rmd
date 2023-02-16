@@ -45,7 +45,7 @@ In addition to the burden of small sample size, probes can be auto-correlated ac
 Methods text
 
 # Analysis
-```{r}
+```{r Data Prep, message=FALSE}
 ######## DMR Analysis Using ENmix ############
 ## load up the packages we will need:  (uncomment as required)
 require(tidyverse)
@@ -54,6 +54,7 @@ require(ENmix)
 require(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 require(org.Hs.eg.db)
 require(gt)
+require(gtExtras)
 require(data.table)
 
 ## Read in the meth results
@@ -105,7 +106,7 @@ data.table::fwrite(dmr.full, file = here("DataProcessed/methylation/DMR/bed/dmr_
                    col.names = F)
 ```
 
-```{bash}
+```{bash Comb-p, eval = F}
 ##### NEED TO RUN IN Python 2.7 (probably with vitual env) sqlalchemy version = 1.0
 # Sort the file using bedtools
 FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*.bed"
@@ -132,185 +133,78 @@ source .venv/bin/activate
 FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*_forCombp.bed"
 for file in $FILES ; do
   output="${file}.combp_results"
-  comb-p pipeline -c 4 --seed 0.1 --dist 750 -p $output --anno hg18 $file
+  comb-p pipeline -c 4 --seed 0.1 --dist 750 -p $output --anno hg19 $file
 done
-```
 
-
-```{bash}
-## Moving files to correct directory
+## Moving output files to correct directory
 #Set Working Directory
 cd /Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync
 
-mv ./DataProcessed/methylation/DMR/bed/dmr_full.bed_sorted.bed_forCombp.bed.combp_results.anno.hg18.bed ./DataProcessed/methylation/DMR/results/dmr_res_py.bed
-
+mv ./DataProcessed/methylation/DMR/bed/dmr_full.bed_sorted.bed_forCombp.bed.combp_results.anno.hg19.bed ./DataProcessed/methylation/DMR/results/dmr_res_py.bed
 ```
 
-```{r completing_results}
+# Results 
+
+```{r completing_results, message=T}
 ## Want to read back in results to figure out + and - methylated sites in each DMR
 
 #Read back in the results from comb-p
 dmr.res <- read_tsv(here("DataProcessed/methylation/DMR/results/dmr_res_py.bed")) %>% 
   janitor::clean_names() %>% 
-  dplyr::rename(chrom = number_chrom) %>% 
-  dplyr::mutate(id = seq(1, length(dmr_res_py$chrom), 1), .before = 1)
+  dplyr::rename(chrom = number_chrom)
 
 #Produce key file for dmp res
 dmp.key <- cpg.island.map %>% 
   dplyr::select(chrom, pos, CpG_Site, Estimate, pval.bacon) %>%
   drop_na(chrom) %>% 
-  mutate(chrom = paste0('chr', chrom)) %>% 
-  distinct()
+  mutate(chrom = paste0("chr", chrom))
 
-#Find which cpgs 
+#Find which cpgs that fall within each DMR and sum up if they are pos or neg methylated
 get_meth_dir <- function(dmr, dmp) {
-  tmp_res <- matrix(ncol = 2, nrow = dim(dmr)[1])
-  colnames(tmp_res) <- c("n_pos", "n_neg")
+  tmp_res <- matrix(ncol = 3, nrow = dim(dmr)[1])
+  colnames(tmp_res) <- c("cpg_sites","n_meth_pos", "n_meth_neg")
   
   for (i in 1:dim(dmr)[1]){
     chr <- dmr$chrom[[i]]
     start <- dmr$start[[i]]
     end <- dmr$end[[i]]
+    minp <- dmr$min_p[[i]]
     
     temp <- dmp[dmp$chrom == chr & between(dmp$pos, start, end),]
-    tmp_res[i,] <- c(sum(temp$Estimate > 0), sum(temp$Estimate < 0))
+    cpg_list <- paste(temp$CpG_Site, collapse = ";")
+    tmp_res[i,] <- c(cpg_list, sum(temp$Estimate > 0), sum(temp$Estimate < 0))
   }
   
   return(cbind(dmr, tmp_res))
   
 }
 
-test <- get_meth_dir(dmr.res, dmp.key)
-
-```
-
-
-```{r}
-### Create Bedfiles for CpG Islands and DMR Results ###
-
-## Make key file for CpG's to islands
-cpg.island.map <- mapping %>% 
-  mutate(island_name_clean = gsub(".*:", "", island_name),
-         start = sapply(strsplit(island_name_clean, "-"), `[`, 1),
-         end = sapply(strsplit(island_name_clean, "-"), `[`, 2))
-
-#Select the columns we want
-bedNames <- c("chrom", "start", "end")
-
-#Drop Non-islands
-cpg.island.bed <- cpg.island.map[,c(bedNames, "island_name")] %>% 
-  tidyr::drop_na(start) %>% 
-  distinct()
-
-#Write out .bed file
-write_tsv(cpg.island.bed, here("DataProcessed/methylation/DMR/bed/cpg_islands.bed"),
-          col_names = FALSE)
-
-## Reformat DMR results to bed file
-#Load File
-dmr.res <- read_csv(here("DataProcessed/methylation/DMR/results/combp_res.csv"))
-
-## reformat
-dmr.bed <- dmr.res %>% 
-  mutate("chrom" = paste0("chr", chr)) %>% 
-  dplyr::select(bedNames, sidak, nprobe, probe)
-
-## Wirte out dmr as bed file
-write_tsv(dmr.bed, here("DataProcessed/methylation/DMR/bed/dmr_res.bed"),
-          col_names = FALSE)
-```
-
-```{bash}
-<!-- ## Intersect DMR and CpG Islands ## -->
-
-<!-- #Change Working Directory -->
-<!-- cd /Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed -->
-
-<!-- # run intersect using bedtools -->
-<!-- bedtools intersect -a dmr_res.bed -b cpg_islands.bed -wa -wb > ./dmr_island_overlap.txt -->
-```
-
-```{r}
-### Read back in overlap resutls ###
-## get all the column names back
-intersect.colnames <- c(names(dmr.bed), names(cpg.island.bed)) 
-
-dmr_intersect <- read_tsv(here("DataProcessed/methylation/DMR/bed/dmr_island_overlap.txt"), col_names = intersect.colnames) %>% 
-  distinct()
-
-dmr_res_py <- read_tsv(here("DataProcessed/methylation/DMR/bed/dmr_res_python.bed")) %>% 
+#Running the function 
+dmr.full.anno <- get_meth_dir(dmr.res, dmp.key) %>% 
+  mutate(n_meth_pos = as.numeric(n_meth_pos),
+         n_meth_neg = as.numeric(n_meth_neg)) %>% 
   arrange(z_sidak_p)
 
-write_csv(dmr_res_py, here("DataProcessed/methylation/DMR/results/dmr_res_python.csv"))
+#Subset any rows where number of positively and negatively methylated probes does not sum to n_probes
+wrong <- dmr.full.anno[!dmr.full.anno$n_meth_pos + dmr.full.anno$n_meth_neg == dmr.full.anno$n_probes,]
 
-#Unlist genes and islands
-genelist <- strsplit(mapping$RefSeq, split = ";")
-names(genelist) <- mapping$island_name
-islands <- unlist(genelist)
-islands <- islands[names(islands) != ""]
-
-
-
-#Create Key file for islands to genes
-islands.genes.map <- data.frame(island_name = names(islands),
-                                gene_name = islands) %>% 
-  distinct() %>% 
-  group_by(island_name) %>%
-  summarize(gene_name = paste(unique(gene_name), collapse = "; ")) %>%
-  ungroup()
-
-#Join key with intersect file
-dmr_intersect <- left_join(dmr_intersect, islands.genes.map, by = "island_name")
-
-# Drop unneeded columns
-dmr_intersect <- dmr_intersect %>% 
-  dplyr::select(-c(chrom...7, start...8, end...9))
-
-# Rename columns
-names(dmr_intersect) <- c(bedNames, "sidak", "nprobe", "probe", "island_name", "gene_name")
-
-# Create an ID filed in order to rejoin the number of positively and negatively methylated probes
-dmr_intersect$id <- seq(1,length(dmr_intersect$chrom), 1)
-
-# Prepare probes to lookup in methylation results
-probe.map <- dmr_intersect %>% 
-  dplyr::select(id, probe) %>% 
-  separate_rows(probe, sep = ";")
-
-# Join for lookup
-probe.map.full <- left_join(probe.map, meth_res, by = c("probe" = "CpG_Site"))
-
-#Create a way to track positive and negative methylation
-probe.map.full$meth_dir <- if_else(probe.map.full$Estimate > 0, "+", "-")
-
-#Create summary of positive and negative probes
-probe.dir.match <- probe.map.full %>% 
-  group_by(id) %>% 
-  summarise(n_meth_pos = sum(meth_dir == "+"),
-            n_meth_neg = sum(meth_dir == "-")) %>% 
-  ungroup()
-
-# Join back to original results
-dmr.full.res <- left_join(dmr_intersect, probe.dir.match, by = "id") %>% 
-  dplyr::select(chrom, start, end, sidak, nprobe, n_meth_pos, n_meth_neg, island_name, gene_name) %>% 
-  arrange(sidak)
-
-#Write out the Results
-#write_csv(dmr.full.res, here("DataProcessed/methylation/DMR/results/combp_format_res.csv"))
-
-
-  
+message("There are ", dim(wrong)[1], " DMRs where the number of positively and negatively methylated probes do not sum to n_probes. There p-values are >", round(min(wrong$z_sidak_p), 2), ".")
 ```
 
-# Results 
+
 ```{r}
+
+dmr.full.sig <- dmr.full.anno %>%
+  filter(z_sidak_p < 0.2)
+
 #results table
-dmr.full.res %>% 
-  filter(sidak < 0.2) %>% 
-  mutate(sidak.p = if_else(sidak < 0.001, "<0.001", as.character(round(sidak, 3)))) %>% 
-  dplyr::select(chrom, start, end, sidak.p, nprobe, n_meth_pos, n_meth_neg, island_name, gene_name) %>% 
+ dmr.full.sig %>% 
+  mutate(sidak.p = if_else(z_sidak_p < 0.001, "<0.001", as.character(round(z_sidak_p, 3)))) %>% 
+  dplyr::select(chrom, start, end, sidak.p, n_probes, ref_gene_name, n_meth_pos, n_meth_neg) %>% 
   gt() %>% 
   fmt_integer(columns = c(2, 3)) %>% 
+  gt_highlight_rows(rows = which(dmr.full.anno$z_sidak_p < 0.1), 
+                    font_weight = "bold", alpha = 0.5) %>% 
   tab_header(title = "Table 1: Top DMRs by Sidak-Adjusted p-value") %>% 
   tab_options(table.width = 700,
               table.font.size = 13)
