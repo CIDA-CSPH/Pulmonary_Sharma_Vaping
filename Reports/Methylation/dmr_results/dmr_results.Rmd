@@ -1,11 +1,11 @@
 ---
-title: Report
+title: Differentially Methylated Regions (DMR)
 author: |
- | Project: `r CIDAtools::ProjectName()`
+ | Project: Differential Gene Expression and Pulmonary Function in Vaping LatinX Adolescents
  |
- | Analyst: `r CIDAtools::ProjectAnalyst()`
+ | Analyst: Trent Hawkins
  |
- | Investigator(s): `r CIDAtools::ProjectPI()`
+ | Investigator(s): Sunita Sharma, MD
  |
  | Report generated: `r paste(format(Sys.Date(), '%B %d, %Y'))`
 output:
@@ -17,6 +17,8 @@ output:
     toc_depth: 2
     toc_float: yes
     code_folding: hide
+csl: ama.csl
+bibliography: references.bib
 ---
 
 ```{r, echo=FALSE, out.width='70%', fig.show='hold'}
@@ -24,7 +26,7 @@ logo <- system.file("figures", "sph_cida_wm_blk.png", package="CIDAtools")
 knitr::include_graphics(logo)
 ```
 
----
+------------------------------------------------------------------------
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = T, message = F, error = F, warning = F)
@@ -32,25 +34,40 @@ library(tidyverse)
 library(knitr)
 library(kableExtra)
 library(table1)
+
+kablize <- function(tab, digits = 3, caption) {
+  kable(tab,digits = digits, booktabs = T, caption = caption) %>% 
+  kableExtra::kable_styling(latex_options = c("hold_position", "striped"), position = "center")
+}
+
+format_num <- function(number, digits = 0, format = "f") {
+  formatC(number, digits = digits, format = format, big.mark = ",")
+}
 ```
 
 # Introduction
 
-The purpose of this report is to identify differentially methylated regions (DMRs) in the naso-epithelial methylation data of vaping and non-vaping adolescents. The previous analysis was a targeted methylation analysis informed by the set of genes found to be differentially expressed in the report "teen_vape_DE_report_yyyy_mm_dd". There was a concern that the burden of multiple testing may still be too large for the relatively small sample size of this study. 
+The purpose of this report is to identify differentially methylated regions (DMRs) in the naso-epithelial methylation data of vaping and non-vaping adolescents. The previous analysis was a targeted methylation analysis informed by the set of genes found to be differentially expressed in the report "teen_vape_DE_report_yyyy_mm_dd". There was a concern that the burden of multiple testing may still be too large for the relatively small sample size of this study.
 
-In addition to the burden of small sample size, probes can be auto-correlated across the genome which may further reduce statistical power. To account 
+In addition to the burden of small sample size, probes can be auto-correlated across the genome which may further reduce statistical power. To address this limitation, we will use the comb-p (combining p-values) method introduce by Kechris, et. al. (2010) @kechris2010 and implemented in the python package *comb-p* @pedersen2012. This software "(1) calculates auto-correlation, (2) combines adjacent *P*-values, (3) performs false discovery adjustment, (4) finds regions of enrichment (i.e. series of adjacent low *P*-values) and (5) assigns significance to those regions." @pedersen2012
+
+The product of this report will be differentially methylated regions along with the CpG probes and genes which those regions overlap.
 
 # Methods
 
-Methods text
+All analyses presented in this report were produced using the combined-pvalues (0.50.6-0) package available [here](https://github.com/brentp/combined-pvalues). Implementation of this package can be somewhat difficult for users that are new to python. For that reason, we have created a users guide for those who need it which is available under "Reports/comb-p/combp_for_dummies.html" in the associated directory.
+
+[Bedtools](https://bedtools.readthedocs.io/en/latest/content/installation.html) is another command-line tool needed to create the sorted '.bed' files requires as input to comb-p.
+
+Corrections for multiple testing in comb-p are made using the Sidak correction. The nature of this study is exploratory, and all sidak-corrected p-values up to a type-I error rate of 0.2 will be reported.
 
 # Analysis
+
 ```{r Data Prep, message=FALSE}
 ######## DMR Analysis Using ENmix ############
 ## load up the packages we will need:  (uncomment as required)
 require(tidyverse)
 require(here)
-require(ENmix)
 require(IlluminaHumanMethylationEPICanno.ilm10b4.hg19)
 require(org.Hs.eg.db)
 require(gt)
@@ -58,7 +75,7 @@ require(gtExtras)
 require(data.table)
 
 ## Read in the meth results
-meth_res <- read_csv(here("DataProcessed/methylation/results/full_res_bacon_2022_12_01.csv")) 
+meth_res <- read_csv(here("DataProcessed/methylation/EWAS/results/full_res_bacon_2022_12_01.csv")) 
 
 ## Access annotation data
 data("IlluminaHumanMethylationEPICanno.ilm10b4.hg19")
@@ -73,8 +90,6 @@ mapping <- data.frame("Name" = annotation.table$Name,
                       "strand" = annotation.table$strand,
                       "island_name" = annotation.table$Islands_Name,
                       "relation_to_island" = annotation.table$Relation_to_Island)
-
-dim(mapping)
 
 ## Merge With EWAS results 
 cpg.island.map <- left_join(meth_res, mapping, by = c("CpG_Site" = "Name"))
@@ -100,56 +115,56 @@ dmr.full <- cpg.island.map %>%
   dplyr::rename(chrom = chr,
                 rawp = p)
 
-data.table::fwrite(dmr.full, file = here("DataProcessed/methylation/DMR/bed/dmr_full.bed"),
-                   sep = "\t",
-                   row.names = F,
-                   col.names = F)
+# data.table::fwrite(dmr.full, file = here("DataProcessed/methylation/DMR/bed/dmr_full.bed"),
+#                    sep = "\t",
+#                    row.names = F,
+#                    col.names = F)
 ```
 
 ```{bash Comb-p, eval = F}
-##### NEED TO RUN IN Python 2.7 (probably with vitual env) sqlalchemy version = 1.0
-# Sort the file using bedtools
-FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*.bed"
-
-for file in $FILES ; do
-  output="${file}_sorted.bed"
-  sortBed -i $file > $output
-done
-
-# Attatch the appropriate column names for comb-p
-FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*_sorted.bed"
-for file in $FILES ; do
-  output="${file}_forCombp.bed"
-  echo -e "chrom\tstart\tend\trawp" | cat - $file > $output
-done
-
-#Change directory
-cd /Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync
-
-#Activate Virtual Environment with python 2.7.x
-source .venv/bin/activate
-
-# Run Comb-p
-FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*_forCombp.bed"
-for file in $FILES ; do
-  output="${file}.combp_results"
-  comb-p pipeline -c 4 --seed 0.1 --dist 750 -p $output --anno hg19 $file
-done
-
-## Moving output files to correct directory
-#Set Working Directory
-cd /Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync
-
-mv ./DataProcessed/methylation/DMR/bed/dmr_full.bed_sorted.bed_forCombp.bed.combp_results.anno.hg19.bed ./DataProcessed/methylation/DMR/results/dmr_res_py.bed
+# ##### NEED TO RUN IN Python 2.7 (probably with vitual env) sqlalchemy version = 1.0
+# # Sort the file using bedtools
+# FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*.bed"
+# 
+# for file in $FILES ; do
+#   output="${file}_sorted.bed"
+#   sortBed -i $file > $output
+# done
+# 
+# # Attatch the appropriate column names for comb-p
+# FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*_sorted.bed"
+# for file in $FILES ; do
+#   output="${file}_forCombp.bed"
+#   echo -e "chrom\tstart\tend\trawp" | cat - $file > $output
+# done
+# 
+# #Change directory
+# cd /Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync
+# 
+# #Activate Virtual Environment with python 2.7.x
+# source .venv/bin/activate
+# 
+# # Run Comb-p
+# FILES="/Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync/DataProcessed/methylation/DMR/bed/*_forCombp.bed"
+# for file in $FILES ; do
+#   output="${file}.combp_results"
+#   comb-p pipeline -c 4 --seed 0.1 --dist 750 -p $output --anno hg19 $file
+# done
+# 
+# ## Moving output files to correct directory
+# #Set Working Directory
+# cd /Users/hawkjona/Documents/CIDA/Sharma_Vaping_Local.nosync
+# 
+# mv ./DataProcessed/methylation/DMR/bed/dmr_full.bed_sorted.bed_forCombp.bed.combp_results.anno.hg19.bed ./DataProcessed/methylation/DMR/results/dmr_res_py.bed
 ```
 
-# Results 
+# Results
 
 ```{r completing_results, message=T}
 ## Want to read back in results to figure out + and - methylated sites in each DMR
 
 #Read back in the results from comb-p
-dmr.res <- read_tsv(here("DataProcessed/methylation/DMR/results/dmr_res_py.bed")) %>% 
+dmr.res <- read_tsv(here("DataProcessed/methylation/DMR/results/dmr_res_py.bed"), show_col_types = F) %>% 
   janitor::clean_names() %>% 
   dplyr::rename(chrom = number_chrom)
 
@@ -190,22 +205,83 @@ wrong <- dmr.full.anno[!dmr.full.anno$n_meth_pos + dmr.full.anno$n_meth_neg == d
 
 message("There are ", dim(wrong)[1], " DMRs where the number of positively and negatively methylated probes do not sum to n_probes. There p-values are >", round(min(wrong$z_sidak_p), 2), ".")
 ```
+There is a phenomenon that is still not well understood in which the number of positively and negatively methylated probes in a region do not sum to the "n_probes" parameter output by comb-p. This issue does not effect the results presented in this report, but still needs to be addressed.  
 
 
+Table 1 shows the number of differentially methylated regions at Type-I error rates of 0.05, 0.1, and 0.2. 
 ```{r}
-
+#Subset to corrected p-valus <0.2
 dmr.full.sig <- dmr.full.anno %>%
   filter(z_sidak_p < 0.2)
 
+dmr.sig.05 <- dmr.full.anno %>% 
+  filter(z_sidak_p < 0.05) %>% 
+  dim() %>% 
+  .[1]
+dmr.sig.1 <- dmr.full.anno %>% 
+  filter(z_sidak_p < 0.1) %>% 
+  dim() %>% 
+  .[1]
+
+dmr.sig.2 <- dmr.full.anno %>% 
+  filter(z_sidak_p < 0.2) %>% 
+  dim() %>% 
+  .[1]
+
+data.frame("Type-I Error" = c(0.05, 0.1, 0.2),
+           "DMRs" = c(dmr.sig.05, dmr.sig.1, dmr.sig.2)) %>% 
+  kablize(caption = "Table 1: DMRs at the associated Type-I error rate cutoff.")
+```
+```{r}
+#Create formatted results sheet for Sarah
+#Fix duplicates in refgene_name
+dmr.full.anno$ref_gene_fix <- lapply(dmr.full.anno$ref_gene_name, FUN = function(x){strsplit(x, ";") %>% unlist() %>% unique() %>% paste0(collapse = ";") %>% unlist()})
+
+#fix ref_gene_name
+dmr.full.anno$ref_gene_name <- dmr.full.anno$ref_gene_fix %>% unlist()
+
+#Get rid of the columns we don't need
+dmr.res.report <- dmr.full.anno %>% 
+  select(-c(min_p, dplyr::contains("cpg_island"), ref_gene_fix))
+
+#Get all unique cpgs from DMR
+cpgs_in_dmr <- strsplit(dmr.res.report$cpg_sites, ";") %>% unlist() %>% unique()
+
+#Subset methylation results
+dmr.meth.match <- meth_res %>% 
+  filter(CpG_Site %in% cpgs_in_dmr) %>% 
+  dplyr::select(-c(p.value, fdr))
+
+#Load in de results
+de_res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/vape_results_reporting_2022_12_01.csv"))
+
+#Get all unique genes from DMR
+genes_in_dmr <- strsplit(dmr.res.report$ref_gene_name, ";") %>% unlist() %>% unique()
+
+#Subset results from DE
+dmr.gene.match<- de_res %>% 
+  filter(Symbol %in% genes_in_dmr)
+
+list_of_datasets <- list("DMR" = dmr.res.report, "EWAS" = dmr.meth.match, "Diff. Expression" = dmr.gene.match)
+
+#writexl::write_xlsx(list_of_datasets, here("DataProcessed/methylation/DMR/results/dmr_full_report.xlsx"))
+```
+
+Table 2 shows all DMRs with sidak-adjusted p-values \< 0.2 in addition to their associated RefGenes from the UCSC genome browser.
+
+```{r}
+
+
 #results table
- dmr.full.sig %>% 
+ dmr.res.report %>% 
+  filter(z_sidak_p < 0.2) %>% 
   mutate(sidak.p = if_else(z_sidak_p < 0.001, "<0.001", as.character(round(z_sidak_p, 3)))) %>% 
   dplyr::select(chrom, start, end, sidak.p, n_probes, ref_gene_name, n_meth_pos, n_meth_neg) %>% 
   gt() %>% 
   fmt_integer(columns = c(2, 3)) %>% 
   gt_highlight_rows(rows = which(dmr.full.anno$z_sidak_p < 0.1), 
                     font_weight = "bold", alpha = 0.5) %>% 
-  tab_header(title = "Table 1: Top DMRs by Sidak-Adjusted p-value") %>% 
+  tab_header(title = "Table 2: Top DMRs by Sidak-Adjusted p-value") %>% 
   tab_options(table.width = 700,
               table.font.size = 13)
 ```
@@ -213,18 +289,16 @@ dmr.full.sig <- dmr.full.anno %>%
 
 # Conclusions
 
-Interpretations, discussion
+The DMR analysis provided by comb-p may have helped to identify some additional methylation patterns across the genome in vaping adolescents when compared to non-vaping adolescents. Some of the genes found in the table above are already discussed in the upcoming publication. This analysis may provide additional support for those findings. 
 
 # References
-
-
-# Appendix
+::: {#refs}
+:::
 
 <!-- footer -->
 
----
+------------------------------------------------------------------------
 
 ```{r, echo=FALSE, out.width='70%', fig.show='hold'}
 knitr::include_graphics(logo)
 ```
-

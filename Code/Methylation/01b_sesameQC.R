@@ -50,10 +50,10 @@ methylation_BMIQ_DB2 <- openSesame(methylation_raw, prep = "QCPBMD",
 # mutate(outlier = if_else(mean_intensity < outlier_quant[1], T, F))
 # 
 # #Write out methylation qc file
-# write_csv(methylation_qc, here("DataProcessed/methylation/methylation_qc_metrics.csv"))
+# write_csv(methylation_qc, here("DataProcessed/methylation/QC/methylation_qc_metrics.csv"))
 
 #Read in Methylation QC File
-methylation_qc <- read_csv(here("DataProcessed/methylation/methylation_qc_metrics.csv"))
+methylation_qc <- read_csv(here("DataProcessed/methylation/QC/methylation_qc_metrics.csv"))
 
 methylation_qc <- left_join(methylation_qc, metadata_sex %>% select(rna_id, methylation_id, sid, sentrix_name, vape_6mo_lab), by = "sentrix_name")
 
@@ -169,7 +169,7 @@ p_inline_res <- function(samp_names, raw_mean){
 #Get the % of samples with > avg distance from the line for each subject and each normalization procedure
 deviation_res <- p_inline_res(rand_sdf, raw_quants_mean) 
 
-#write_csv(deviation_res, here("DataProcessed/methylation/dye_bias_quality_check.csv"))
+#write_csv(deviation_res, here("DataProcessed/methylation/QC/dye_bias_quality_check.csv"))
 
 # Make redgrnqq plot matrix 
 plot_redgrnqq <- function(raw_dat, bmiq_dat, db2dat){

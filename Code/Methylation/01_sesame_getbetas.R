@@ -63,8 +63,8 @@ mvals_write <- BetaValueToMValue(betas) %>%
 betas_write <- betas %>% 
   rownames_to_column(var = "CpG_Site")
 
-#write_tsv(betas_write, here("DataProcessed/methylation/methylation_betas_final_2022_09_27.txt"))
-#write_tsv(mvals_write, here("DataProcessed/methylation/methylation_mvals_final_2022_09_27.txt"))
+#write_tsv(betas_write, here("DataProcessed/methylation/QC/methylation_betas_final_2022_09_27.txt"))
+#write_tsv(mvals_write, here("DataProcessed/methylation/QC/methylation_mvals_final_2022_09_27.txt"))
 
 
 # Autosomal Betas ---------------------------------------------------------
@@ -97,4 +97,4 @@ betas_auto <- get_auto_vals(methyl_norm)
 betas_auto_write <- betas_auto %>% 
   rownames_to_column(var = "CpG_Site")
 
-write_tsv(betas_auto_write, here("DataProcessed/methylation/autosomal_betas_final_2022_09_30.txt"))
+write_tsv(betas_auto_write, here("DataProcessed/methylation/QC/autosomal_betas_final_2022_09_30.txt"))

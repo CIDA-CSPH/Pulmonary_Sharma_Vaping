@@ -47,7 +47,7 @@ format_num <- function(number, digits = 0, format = "f") {
 }
 
 # Load the results from code "05_targeted_meth.R"
-sigCites.final <- read_csv(here("DataProcessed/methylation/results/results_targeted_2023_01_19.csv"))
+sigCites.final <- read_csv(here("DataProcessed/methylation/Targeted/results/results_targeted_2023_01_19.csv"))
 
 # Load RNASeq REsults
 RNAseq.res <- read_csv(here("DataProcessed/rna_seq/differential_expression/full_analysis/full_vape_res_2022_10_13.csv"))
@@ -128,7 +128,7 @@ top5 <- sigCite %>%
 gene.map <- sigCite %>% 
   dplyr::select(cpg, symbol)
 
-mvals <- read_tsv(here("DataProcessed/methylation/methylation_mvals_final_2022_09_27.txt")) 
+mvals <- read_tsv(here("DataProcessed/methylation/QC/methylation_mvals_final_2022_09_27.txt")) 
 
 mvals.fullTarget <- mvals %>% 
   dplyr::filter(CpG_Site %in% top5) %>%
@@ -248,7 +248,7 @@ GO.sig <- pathway.res %>%
 # Read Methylation Results and extract CpG Sites mapped to sig Genes --------
 
 ## Read in the meth results
-meth_res <- read_csv(here("DataProcessed/methylation/results/full_res_bacon_2022_12_01.csv"))
+meth_res <- read_csv(here("DataProcessed/methylation/EWAS/results/full_res_bacon_2022_12_01.csv"))
 
 ## Genes to CpG Key
 genes_to_cpg <- .getFlatAnnotation(array.type = "EPIC")

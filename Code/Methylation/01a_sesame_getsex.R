@@ -37,6 +37,6 @@ metadata_pred_sex <- left_join(clin_metadata, pred_sex_df, by = "sentrix_name")
 
 metadata_all_sex <- left_join(metadata_pred_sex, chr_intensity, by = "sentrix_name")
 
-#write_csv(metadata_all_sex, here("DataProcessed/methylation/metadata_all_sex_yyyy_mm_dd.csv"))
+#write_csv(metadata_all_sex, here("DataProcessed/methylation/QC/metadata_all_sex_yyyy_mm_dd.csv"))
 
 
