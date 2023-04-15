@@ -1,17 +1,26 @@
 ---
-title: "Comb-p For Dummies"
+title: "How To Run Comb-p"
 author: "Trent Hawkins"
+date: today
 execute: 
   eval: false
 engine: knitr
 format: html
+bibliography: references.bib
+csl: ama.csl
 ---
 
 ## Motivation
 
-When working on a Methylation project in 2023, I was nearing the end and it was time to run a Differentially Methylated Region (DMR) analysis. A common method to carry out DMR analyses is known as combined-pvalues (comb-p), and the most popular tool for implementing this method is a command-line tool that allows the user to run a series of python code files by executing one line of code. As a novice in python, I was completely overwhelmed with the vast array of options for installing and running this tool. Furthermore, the software is over a decade old, sometimes relying on outdated packages and the documentation is not completely thorough. For python pros, this document will be completely overkill. Its purpose is to document one way that I was able to get the comb-p pipeline involved after much pain and suffering. Don't be scared! It's really straight-forward in the end.
+When working on a Methylation project in 2023, I was nearing the end and it was time to run a Differentially Methylated Region (DMR) analysis. A common method to carry out DMR analyses is known as combined-pvalues (comb-p), and the most popular tool for implementing this method is a command-line tool that allows the user to run a series of python code files by executing one line of code. As a novice in python, I was completely overwhelmed with the vast array of options for installing and running this tool. Furthermore, the software is over a decade old, sometimes relying on outdated packages and the documentation is not completely thorough. For python pros, this document will be completely overkill. Its purpose is to document one way that I was able to get the comb-p pipeline to run after much pain and suffering. Don't be scared! It's really straight-forward in the end.
 
-Please note that that the mechanisms behind the inter-workings of comb-p are outside of the scope of this document. For more information, please reference [github](https://github.com/brentp/combined-pvalues/) for comb-p.
+Some Notes:
+
+-   Much of the code in this document was adapted from a report that I inherited from CIDA and CODS team-member Sierra Niemiec, who had run this analysis for another project previously @Niemiec2022.
+
+-   The mechanisms behind the inter-workings of comb-p are outside of the scope of this document. For more information, please reference [github](https://github.com/brentp/combined-pvalues/) for comb-p [@pedersen2012; @Kechris2010].
+
+-   All of code presented in this report was run on Mac OS Ventura 13.2.1. Commands in the terminal may differ slightly for Windows users. Linux should be very similar or the same.
 
 ## Installing Conda
 
@@ -31,9 +40,9 @@ conda create --name CombpEnv python=2.7
 conda activate CombpEnv
 ```
 
-Great! Now you have created your virtual environment, which is running Python 2.7.x, and activated it. You should see the name of your active environment on the left side of your terminal.  
+Great! Now you have created your virtual environment, which is running Python 2.7.x, and activated it. You should see the name of your active environment on the left side of your terminal.
 
-## Setting up the BioConda channel 
+## Setting up the BioConda channel
 
 BioConda is the channel (place that hosts python libraries) that hosts most bioinformatics tools available for Python. We will be using it in order to install Comb-p. As per the setup guidelines available [here](https://bioconda.github.io/), run the following code to configure the BioConda channel.
 
@@ -44,7 +53,7 @@ conda config --add channels conda-forge
 conda config --set channel_priority strict
 ```
 
-Once you have configured the Bioconda Channel, you can ensure that the channels are configured properly by running the following: 
+Once you have configured the Bioconda Channel, you can ensure that the channels are configured properly by running the following:
 
 ```{bash filename = "Terminal"}
 #| eval: true
@@ -57,9 +66,9 @@ If your output matches the output above, you have successfully configured BioCon
 
 In this section, we will install the following libraries and dependencies in order to create the sorted .bed files and run the comb-p pipeline with annotation capabilities:
 
-1. bedtools
-1. combined-pvalues (comb-p)
-1. cruzdb (annotation)
+1.  bedtools
+2.  combined-pvalues (comb-p)
+3.  cruzdb (annotation)
 
 Bedtools and Comb-p can both be installed via the BioConda channel that we already configured.
 
@@ -80,25 +89,26 @@ We will also need to install some of the dependencies of this package, which do 
 #Just going to install all the packages in one line
 conda install sqlalchemy six MySQL-python
 ```
+
 If all of these installations worked, CONGRATULATIONS! You are finally ready to run the comb-p pipeline!
 
 ## Accessing Illumina annotation and creating your first `.bed` file
 
-A `.bed` file is a specific format of plain-text file that defines genetic sequence features to a genetic sequence. What makes a `.bed` file a `.bed` file instead of a `.txt` file is that the first three columns correspond to: 
+A `.bed` file is a specific format of plain-text file that defines genetic sequence features to a genetic sequence. What makes a `.bed` file a `.bed` file instead of a `.txt` file is that the first three columns correspond to:
 
-01. Chromosome Name
+1.  Chromosome Name
 
-    + Chromosome 1, 2, ..., 22, X, Y
+    -   Chromosome 1, 2, ..., 22, X, Y
 
-02. Chromosome Start
+2.  Chromosome Start
 
-    + Position of the first base of the feature sequence. In a DMR, this will come from the field 'pos' in the Illumina annotation and refers to the base where the probe is binded. 
-  
-03. Chromosome End
+    -   Position of the first base of the feature sequence. In a DMR, this will come from the field 'pos' in the Illumina annotation and refers to the base where the probe is binded.
 
-    + Position of the last base of the feature sequence. In a DMR, this can be created as the number from 'pos' \+ 51.
+3.  Chromosome End
 
-In the case of DMR analysis, there will also be a 4th column which corresponds to **unadjusted** p-values from the EWAS which should have been completed before this point. 
+    -   Position of the last base of the feature sequence. In a DMR, this can be created as the number from 'pos' + 51.
+
+In the case of DMR analysis, there will also be a 4th column which corresponds to **unadjusted** p-values from the EWAS which should have been completed before this point.
 
 Next, we will need to access annotation data. I will do this part in R, but I am sure there are other ways to access annotation. To access Illumina's annotation, you can use the `getAnnotation` from the package *minfi*, which can be downloaded from BioConductor. You will likely have already needed this package and function before this point. I will use the Illumina EPIC annotation in this example becuase that is what I used for the related project.
 
@@ -133,7 +143,7 @@ dim(mapping)
 head(mapping)
 ```
 
-Ok, so now the object `mapping` should have all 850,000+ probes from the Illumina annotation, along with which chromosome they appear on, and what position they bind to. We only need the probes that we tested in our EWAS. We can accomplish that using a `left_join`. We will then format the data so that we can write it out as a `.bed` file. 
+Ok, so now the object `mapping` should have all 850,000+ probes from the Illumina annotation, along with which chromosome they appear on, and what position they bind to. We only need the probes that we tested in our EWAS. We can accomplish that using a `left_join`. We will then format the data so that we can write it out as a `.bed` file.
 
 ```{r filename = "R"}
 bed <- left_join(EWAS_res, mapping, by = "Name") 
@@ -162,7 +172,7 @@ mapping.short %>%
   select(chrom, start, end, p)
 ```
 
-It is ok if you have not sorted on any particular column yet. That will be the next step. If your table looks like this, then we can write it out as a `.bed` file using the following: 
+It is ok if you have not sorted on any particular column yet. That will be the next step. If your table looks like this, then we can write it out as a `.bed` file using the following:
 
 ```{r filename = "R"}
 data.table::fwrite(bed_for_combp, file = here::here("path/to/your/file.bed"),
@@ -175,7 +185,7 @@ Awesome! You have written out your `.bed` file. Time to go back to the command l
 
 ## Creating a sorted `.bed` file
 
-Great now it is time to create a sorted `.bed` file, attach the appropriate column names back in, and run comb-p! Ideally, you should have your `.bed` file stored in its own folder because the following steps will create quite a few files. 
+Great now it is time to create a sorted `.bed` file, attach the appropriate column names back in, and run comb-p! Ideally, you should have your `.bed` file stored in its own folder because the following steps will create quite a few files.
 
 ```{bash filename = "Terminal"}
 #Go to the folder where your .bed file is stored
@@ -192,11 +202,15 @@ Great! You have created your file which is ready to go! Time for the grand final
 
 ## Running Comb-p
 
-Now it is time to run comb-p. This step may take some patience. If you follow the instructions as I have outlined them here, everything *should* run smoothly. Please note that some of the settings below are customizable and context-specific. Please make sure you understand the various settings before running this code.  Assuming you are still in the same directory in your terminal:
+Now it is time to run comb-p. This step may take some patience. If you follow the instructions as I have outlined them here, everything *should* run smoothly. Please note that some of the settings below are customizable and context-specific. Please make sure you understand the various settings before running this code. Assuming you are still in the same directory in your terminal:
 
 ```{bash filename = "Terminal"}
 comb-p pipeline -c 4 --seed 0.1 --dist 750 -p combp_res.bed --anno hg19 sorted_for_combp.bed
 ```
 
-You're done! The results file will be something like "combp_res.bed.anno.hg19.bed" and you can read it back in like you would any tab-delimmited file and manipulate it to your liking. 
+You're done! The results file will be something like "combp_res.bed.anno.hg19.bed" and you can read it back in like you would any tab-delimmited file and manipulate it to your liking.
 
+# References
+
+::: {#refs}
+:::

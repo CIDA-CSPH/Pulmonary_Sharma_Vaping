@@ -56,7 +56,7 @@ EnhancedVolcano(results,
                 colConnectors = 'black',
                 title = "",
                 subtitle = "",
-                caption = "Total = 16,860 Genes") + coord_flip()
+                caption = "Total = 16,860 Genes")
 
 
 

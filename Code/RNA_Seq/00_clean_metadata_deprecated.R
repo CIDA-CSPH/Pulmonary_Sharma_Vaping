@@ -114,6 +114,12 @@ vape_dat_clean <- vape_dat_clean %>%
 vape_dat_clean <- vape_dat_clean %>% 
   mutate(vape_6mo_lab = if_else(vape_6mo == TRUE, 'Vaped in Last 6 Months', 'Did Not Vape in Last 6 Months'))
 
+table(vape_dat_clean$vape_6mo_lab, vape_dat_clean$ever_cig)
+
+table(vape_dat_clean$vape_6mo_lab, vape_dat_clean$cig_life)
+
+table(vape_dat_clean$vape_6mo_lab, vape_dat_clean$cig_30days)
+
 #subset data for table1
 tab1_dat <- vape_dat_clean %>% 
   select(sid, recruitment_center, age, sex_lab, grade_lab, latino_lab, ever_vape_lab, vape_30_lab, vape_6mo_lab, fev1, fvc, r5, x20, fev1_fvc)
