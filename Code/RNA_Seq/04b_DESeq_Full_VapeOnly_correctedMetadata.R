@@ -190,6 +190,11 @@ vape_interact_de <- run_deseq_lrt(count_data = filtered_gene_count,
                                  interact = T,
                                  maxit = 10000)
 
+######################### extract counts ###############################
+vape_norm_counts <- as.data.frame(counts(vape_de, normalized = T)) %>% rownames_to_column(var = "ENSG")
+
+write_csv(vape_norm_counts, here("DataProcessed/rna_seq/differential_expression/full_analysis/vape_deseq_normcounts.csv"))
+
 ######################### Get Formatted Results ###############################
 
 vape_res <- format_results(vape_de, gene_annotations)

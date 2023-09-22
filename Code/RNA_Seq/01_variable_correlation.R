@@ -155,7 +155,11 @@ vape_colors <- RColorBrewer::brewer.pal(3, "Dark2")[0:2]
 r5_plot <- ggpubr::ggboxplot(tab1_dat %>% drop_na(vape_6mo_lab), 
                   x = "vape_6mo_lab", y = "r5",
                   palette = vape_colors,
-                  ggtheme = theme_grey()) +
+                  ggtheme = theme_grey(),
+                  outlier.shape = NA,
+                  bxp.errorbar = F,
+                  error.plot = "pointrange") +
+  geom_jitter(width = 0.05)+
   ggpubr::stat_compare_means(method = 't.test',
                              label.x = 0.6,
                              size = 5) +
@@ -165,10 +169,15 @@ r5_plot <- ggpubr::ggboxplot(tab1_dat %>% drop_na(vape_6mo_lab),
        title = "R5 by Vape Status (N = 49)")+
   theme(axis.text.x = element_text(size = 11, color = "black"))
 
+
+
 x20_plot <- ggpubr::ggboxplot(tab1_dat %>% drop_na(vape_6mo_lab), 
                   x = "vape_6mo_lab", y = "x20",
                   palette = vape_colors,
-                  ggtheme = theme_grey()) +
+                  ggtheme = theme_grey(),
+                  outlier.shape = NA,
+                  bxp.errorbar = F) +
+  geom_jitter(width = 0.05)+
   ggpubr::stat_compare_means(method = 't.test',
                              label.x = 0.6,
                              label.y = 3,
@@ -181,8 +190,15 @@ x20_plot <- ggpubr::ggboxplot(tab1_dat %>% drop_na(vape_6mo_lab),
 
 ggpubr::ggarrange(r5_plot, x20_plot, common.legend = T)
 
-tab1_dat %>% 
-  drop_na(vape_6mo_lab) %>% 
-  ggplot(aes(x = vape_6mo_lab, y = r5, fill = vape_6mo_lab)) +
-  geom_boxplot() +
-  scale_fill_manual(values = vape_colors)
+par(mfrow=c(1,2))
+
+library(beeswarm)
+
+plot_dat <- tab1_dat %>% tidyr::drop_na(vape_6mo_lab)
+
+bxplot(plot_dat$r5 ~ plot_dat$vape_6mo_lab, main = "R5 by Vape Status (N = 49)", xlab = "", ylab = "R5", height = 600)
+beeswarm(plot_dat$r5 ~ plot_dat$vape_6mo_lab,  corral = "wrap",  pch = 16, cex = 1, add = TRUE)
+
+bxplot(plot_dat$x20 ~ plot_dat$vape_6mo_lab, main = "X20 by Vape Status (N = 44)", xlab = "", ylab = "X20", height = 600)
+beeswarm(plot_dat$x20 ~ plot_dat$vape_6mo_lab,  corral = "wrap",  pch = 16, cex = 1, add = TRUE)
+

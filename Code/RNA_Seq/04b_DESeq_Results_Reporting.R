@@ -27,7 +27,7 @@ results <- results %>%
 lab_italics <- paste0("italic('", results$Symbol, "')")
 selectLab_italics = paste0(
   "italic('",
-  c("NDC80", "PTGER3", "MUC5AC", "MUC12", "WNT5B", "WNT3A", "WNT4", 'IL1B', 'DPYS', 'DEFB4B', 'EIF1AY'),
+  c("RYR3", 'IL1B', 'DPYS', 'DEFB4B'),
   "')")
 
 EnhancedVolcano(results,

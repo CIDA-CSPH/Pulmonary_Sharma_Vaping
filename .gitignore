@@ -51,4 +51,7 @@ vignettes/*.pdf
 *.tsv
 *.tsv
 *.zip
+*.fastq
+*.docx
+*.DS_Store
 Code/cpv

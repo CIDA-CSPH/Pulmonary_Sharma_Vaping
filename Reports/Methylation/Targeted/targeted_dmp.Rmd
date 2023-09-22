@@ -151,7 +151,7 @@ vape_cols <- RColorBrewer::brewer.pal(3, "Dark2")[1:2]
 mvals_plot %>%
   ggplot(aes(x = vape_6mo_lab, y = estimate, fill = vape_6mo_lab)) +
   geom_boxplot() +
-  facet_wrap(~label) +
+  facet_wrap(~label, scales = "free_y") +
   scale_fill_manual(values = vape_cols) +
   theme(legend.position = "bottom",
         axis.text.x = element_blank()) +
