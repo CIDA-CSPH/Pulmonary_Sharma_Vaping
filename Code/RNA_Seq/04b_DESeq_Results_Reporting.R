@@ -3,7 +3,7 @@
 ##
 ## Purpose of script: Fomrat results for Sarah 
 ##
-## Author: Trent Hawkins
+## Author: Trent Hawkins (edited Cheyret Wood 2024)
 ##
 ## Date Created: 2022-12-01
 ## ---------------------------
@@ -24,10 +24,14 @@ results <- results %>%
          "FDR" = padj) %>% 
   select(-c(gene_type, baseMean, lfcSE, stat)) %>% as.data.frame()
 
+# top 5  up and down
+topUp <- results %>% filter(Log2FoldChange > 2) %>% arrange(FDR) %>% head(5)
+topDn <- results %>% filter(Log2FoldChange < -2) %>% arrange(FDR) %>% head(5)
+
 lab_italics <- paste0("italic('", results$Symbol, "')")
 selectLab_italics = paste0(
   "italic('",
-  c("RYR3", 'IL1B', 'DPYS', 'DEFB4B'),
+  c(topUp$Symbol, topDn$Symbol),
   "')")
 
 EnhancedVolcano(results,
