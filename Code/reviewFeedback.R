@@ -149,7 +149,7 @@ s <- 0
 
 outDf <- data.frame("cpg"  = rep(NA, 75), 
                     "gene" = rep(NA, 75), 
-                    "cor"  = rep(NA, 75), 
+                    "estimate"  = rep(NA, 75), 
                     "p"    = rep(NA, 75))
 
 for(i in 1:nrow(dmr.full.anno.filter2)){
@@ -177,7 +177,7 @@ for(i in 1:nrow(dmr.full.anno.filter2)){
     
       outDf$cpg[s]  <- cpgs[j]
       outDf$gene[s] <- genes[k]
-      outDf$cor[s]  <- out$coefficients["get(cpgs[j])", "Estimate"]
+      outDf$estimate[s]  <- out$coefficients["get(cpgs[j])", "Estimate"]
       outDf$p[s]    <- out$coefficients["get(cpgs[j])", "Pr(>|t|)"]
       
       if(out$coefficients["get(cpgs[j])", "Pr(>|t|)"] < 0.1){
@@ -185,17 +185,21 @@ for(i in 1:nrow(dmr.full.anno.filter2)){
         plot(meta02[,cpgs[j]], as.numeric(meta02[,genes[k]]), 
              xlab = paste0("M-Values of ", cpgs[j]), 
              ylab = paste0("Normalized ", genes[k], " Counts"), 
-             main = paste0("Linear Model Estimate = ", formatC(out$coefficients["get(cpgs[j])", "Estimate"], format = "E", digits = 0), "\np-value = ",  round(out$coefficients["get(cpgs[j])", "Pr(>|t|)"], 2)))
+             main = paste0("Linear Model Estimate = ", round(out$coefficients["get(cpgs[j])", "Estimate"], digits = 0), "\np-value = ",  round(out$coefficients["get(cpgs[j])", "Pr(>|t|)"], 2)))
         dev.off()
       }
     }
   }
 }
 
+# remove the duplicates
+outDf <- outDf %>% distinct(cpg, gene, .keep_all = T)
+
 # calculate FDR
 outDf$FDR <- p.adjust(outDf$p, method = "BH")
 
 outDf %>% arrange(p) %>% filter(p < 0.05)
+outDf %>% arrange(p) %>% filter(p < 0.1)
 
 write.csv(outDf %>% arrange(p), row.names = F, 
           file = "P:/BRANCHES/Pulmonary/Sharma_Vaping/DataProcessed/reviewerAdditions/lmResults_for_DMR.csv")
